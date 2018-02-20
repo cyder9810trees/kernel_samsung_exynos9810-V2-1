@@ -47,11 +47,6 @@ config EXYNOS_ZEBU_EMUL_DISP
 	depends on EXYNOS_EVEREST
 	default n
 
-config FB_WINDOW_UPDATE
-        bool "DECON window update mode"
-        depends on EXYNOS_EVEREST
-        default n
-
 config DECON_BLOCKING_MODE
 	bool "DECON blocking mode"
         depends on EXYNOS_EVEREST
@@ -115,7 +110,7 @@ config SUPPORT_DSU
 
 config EXYNOS_MULTIRESOLUTION
 	bool "Multi resolution LCD support"
-	depends on EXYNOS_EVEREST && FB_WINDOW_UPDATE
+	depends on EXYNOS_EVEREST
 	default y
 
 config EXYNOS_VIRTUAL_DISPLAY

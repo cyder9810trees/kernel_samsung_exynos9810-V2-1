@@ -474,7 +474,7 @@ void DPU_EVENT_SHOW(struct seq_file *s, struct decon_device *decon)
 	seq_printf(s, "BlockMode(%s) ",
 			IS_ENABLED(CONFIG_DECON_BLOCKING_MODE) ? "on" : "off");
 	seq_printf(s, "Window_Update(%s)\n",
-			IS_ENABLED(CONFIG_FB_WINDOW_UPDATE) ? "on" : "off");
+			decon->win_up.enabled ? "on" : "off");
 
 	if (decon->id < MAX_DSIM_CNT && decon->dt.out_type == DECON_OUT_DSI) {
 		dsim = get_dsim_drvdata(decon->id);
