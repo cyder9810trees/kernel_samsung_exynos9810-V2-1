@@ -1561,8 +1561,6 @@ void decon_reg_get_clock_ratio(struct decon_clocks *clks,
 		struct decon_lcd *lcd_info);
 void decon_reg_set_mres(u32 id, struct decon_param *p);
 void decon_reg_clear_int_all(u32 id);
-void decon_reg_all_win_shadow_update_req(u32 id);
-void decon_reg_update_req_window(u32 id, u32 win_idx);
 void decon_reg_update_req_window_mask(u32 id, u32 win_idx);
 void decon_reg_set_partial_update(u32 id, enum decon_dsi_mode dsi_mode,
 		struct decon_lcd *lcd_info, bool in_slice[],
@@ -1572,7 +1570,7 @@ void decon_reg_set_start_crc(u32 id, u32 en);
 void decon_reg_set_select_crc_bits(u32 id, u32 bit_sel);
 void decon_reg_get_crc_data(u32 id, u32 *w0_data, u32 *w1_data);
 void dpu_sysreg_set_lpmux(void __iomem *sysreg);
-void decon_reg_set_win_enable(u32 id, u32 win_idx, u32 en);
+void decon_reg_win_enable_and_update(u32 id, u32 win_idx, u32 en);
 
 /* tui feature support external to security driver(gud) */
 int decon_tui_protection(bool tui_en);
