@@ -431,33 +431,6 @@ static void decon_free_dma_buf(struct decon_device *decon,
 #endif
 }
 
-void decon_set_black_window(struct decon_device *decon)
-{
-	struct decon_window_regs win_regs;
-	struct decon_lcd *lcd = decon->lcd_info;
-
-	memset(&win_regs, 0, sizeof(struct decon_window_regs));
-	win_regs.wincon = wincon(0x8, 0xFF, 0xFF, 0xFF, DECON_BLENDING_NONE,
-			decon->dt.dft_win);
-	win_regs.start_pos = win_start_pos(0, 0);
-	win_regs.end_pos = win_end_pos(0, 0, lcd->xres, lcd->yres);
-	decon_info("xres %d yres %d win_start_pos %x win_end_pos %x\n",
-			lcd->xres, lcd->yres, win_regs.start_pos,
-			win_regs.end_pos);
-	win_regs.colormap = 0x000000;
-	win_regs.pixel_count = lcd->xres * lcd->yres;
-	win_regs.whole_w = lcd->xres;
-	win_regs.whole_h = lcd->yres;
-	win_regs.offset_x = 0;
-	win_regs.offset_y = 0;
-	decon_info("pixel_count(%d), whole_w(%d), whole_h(%d), x(%d), y(%d)\n",
-			win_regs.pixel_count, win_regs.whole_w,
-			win_regs.whole_h, win_regs.offset_x,
-			win_regs.offset_y);
-	decon_reg_set_window_control(decon->id, decon->dt.dft_win,
-			&win_regs, true);
-}
-
 int decon_tui_protection(bool tui_en)
 {
 	int ret = 0;
@@ -598,7 +571,6 @@ err:
 static int _decon_enable(struct decon_device *decon,
 		enum decon_state state)
 {
-	struct decon_mode_info psr;
 	struct decon_param p;
 	int ret = 0;
 
@@ -638,8 +610,6 @@ static int _decon_enable(struct decon_device *decon,
 
 	decon_to_init_param(decon, &p);
 	decon_reg_init(decon->id, decon->dt.out_idx[0], &p);
-
-	decon_to_psr_info(decon, &psr);
 
 	if (decon->dt.out_type == DECON_OUT_DSI && decon->state == DECON_STATE_OFF) {
 		/*
@@ -1866,7 +1836,7 @@ static int __decon_update_regs(struct decon_device *decon, struct decon_reg_data
 #endif
 
 	decon_to_psr_info(decon, &psr);
-	if (decon_reg_start(decon->id, &psr) < 0) {
+	if (decon_reg_update_req_and_unmask(decon->id, &psr) < 0) {
 		decon_up_list_saved();
 		decon_dump(decon, REQ_DSI_DUMP);
 #ifdef CONFIG_LOGGING_BIGDATA_BUG
@@ -3892,7 +3862,7 @@ static int decon_initial_display(struct decon_device *decon, bool is_colormap)
 	}
 #endif
 
-	decon_reg_start(decon->id, &psr);
+	decon_reg_update_req_and_unmask(decon->id, &psr);
 	call_panel_ops(dsim, displayon, dsim);
 	decon_wait_for_vsync(decon, VSYNC_TIMEOUT_MSEC);
 	if (decon_reg_wait_update_done_and_mask(decon->id, &psr,
