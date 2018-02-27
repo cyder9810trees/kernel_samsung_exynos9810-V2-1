@@ -1449,7 +1449,7 @@ static int dsim_probe(struct platform_device *pdev)
 #else
 	/* TODO: This is for dsim BIST mode in zebu emulator. only for test*/
 	call_panel_ops(dsim, displayon, dsim);
-	dsim_set_bist(dsim->id, true);
+	dsim_reg_set_bist(dsim->id, true);
 #endif
 
 	/* for debug */
