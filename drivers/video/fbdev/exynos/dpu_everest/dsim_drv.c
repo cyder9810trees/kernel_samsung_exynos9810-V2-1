@@ -585,7 +585,7 @@ static int dsim_get_gpios(struct dsim_device *dsim)
 	return 0;
 }
 
-static int dsim_reset_panel(struct dsim_device *dsim)
+int dsim_reset_panel(struct dsim_device *dsim)
 {
 	struct dsim_resources *res = &dsim->res;
 	int ret;
@@ -611,7 +611,7 @@ static int dsim_reset_panel(struct dsim_device *dsim)
 	return 0;
 }
 
-static int dsim_set_panel_power(struct dsim_device *dsim, bool on)
+int dsim_set_panel_power(struct dsim_device *dsim, bool on)
 {
 	struct dsim_resources *res = &dsim->res;
 	int ret;
@@ -754,7 +754,7 @@ static void dsim_phy_status(void)
 
 static int _dsim_enable(struct dsim_device *dsim, enum dsim_state state)
 {
-	int ret = 0;
+	bool panel_ctrl;
 
 	if (IS_DSIM_ON_STATE(dsim)) {
 		dsim_warn("%s dsim already on(%s)\n",
@@ -778,52 +778,17 @@ static int _dsim_enable(struct dsim_device *dsim, enum dsim_state state)
 	phy_power_on(dsim->phy);
 	dsim_phy_status();
 
-	/* check whether the bootloader init has been done */
-	if (dsim->state == DSIM_STATE_INIT) {
-		if (dsim_reg_is_pll_stable(dsim->id)) {
-			dsim_info("dsim%d PLL is stabled in bootloader, so skip DSIM link/DPHY init.\n", dsim->id);
-			goto init_end;
-		}
-	}
 
-	/* choose OSC_CLK */
-	dsim_reg_set_link_clock(dsim->id, 0);
-	/* Enable DPHY reset : DPHY reset start */
-	dsim_reg_dphy_resetn(dsim->id, 1);
-
-	/* Panel power on */
-	dsim_set_panel_power(dsim, 1);
-
-	dsim_reg_sw_reset(dsim->id);
-
-	dsim_reg_set_clocks(dsim->id, &dsim->clks, &dsim->lcd_info.dphy_pms, 1);
-
-	dsim_reg_set_lanes(dsim->id, dsim->data_lane, 1);
-	dsim_reg_dphy_resetn(dsim->id, 0); /* Release DPHY reset */
-	dsim_reg_set_link_clock(dsim->id, 1);	/* Selection to word clock */
-	dsim_reg_set_esc_clk_on_lane(dsim->id, 1, dsim->data_lane);
-	dsim_reg_enable_word_clock(dsim->id, 1);
-
-	if (dsim_reg_init(dsim->id, &dsim->lcd_info, dsim->data_lane_cnt,
-				&dsim->clks) < 0) {
-		dsim_info("dsim_%d already enabled", dsim->id);
-		ret = -EBUSY;
-	} else {
- #if !defined(CONFIG_EXYNOS_COMMON_PANEL) || defined(CONFIG_OLD_DISP_TIMING)
-		dsim_info("dsim_%d enabled", dsim->id);
-		/* Panel reset should be set after LP-11 */
-		dsim_reset_panel(dsim);
- #endif
-	}
-
-init_end:
+	panel_ctrl = (state == DSIM_STATE_ON) ? true : false;
+	dsim_reg_init(dsim->id, &dsim->lcd_info, &dsim->clks, panel_ctrl);
 	dsim_reg_start(dsim->id);
+
 	dsim->state = state;
 	enable_irq(dsim->res.irq);
 
 	dsim_dbg("%s %s -\n", __func__, dsim_state_names[dsim->state]);
 
-	return ret;
+	return 0;
 }
 
 static int dsim_enable(struct dsim_device *dsim)
@@ -1032,8 +997,6 @@ static int dsim_exit_ulps(struct dsim_device *dsim)
 
 	DPU_EVENT_START();
 	dsim_dbg("%s +\n", __func__);
-	exynos_ss_printk("%s:state %d: active %d:+\n", __func__,
-				dsim->state, pm_runtime_active(dsim->dev));
 
 	if (dsim->state != DSIM_STATE_ULPS) {
 		ret = -EBUSY;
@@ -1051,42 +1014,18 @@ static int dsim_exit_ulps(struct dsim_device *dsim)
 	phy_power_on(dsim->phy);
 	dsim_phy_status();
 
-	enable_irq(dsim->res.irq);
-
-	/* choose OSC_CLK */
-	dsim_reg_set_link_clock(dsim->id, 0);
-	/* Enable DPHY reset : DPHY reset start */
-	dsim_reg_dphy_resetn(dsim->id, 1);
-	/* DSIM Link SW reset */
-	dsim_reg_sw_reset(dsim->id);
-
-	dsim_reg_set_clocks(dsim->id, &dsim->clks,
-			&dsim->lcd_info.dphy_pms, 1);
-
-	dsim_reg_set_lanes(dsim->id, dsim->data_lane, 1);
-	dsim_reg_dphy_resetn(dsim->id, 0); /* release DPHY reset */
-	dsim_reg_set_link_clock(dsim->id, 1);	/* Selection to word clock */
-
-	dsim_reg_set_esc_clk_on_lane(dsim->id, 1, dsim->data_lane);
-	dsim_reg_enable_word_clock(dsim->id, 1);
-
-	if (dsim_reg_init(dsim->id, &dsim->lcd_info, dsim->data_lane_cnt,
-				&dsim->clks) < 0 ) {
-		dsim_info("dsim_%d already enabled", dsim->id);
-		return -EBUSY;
-	}
+	dsim_reg_init(dsim->id, &dsim->lcd_info, &dsim->clks, false);
 	ret = dsim_reg_exit_ulps_and_start(dsim->id, dsim->lcd_info.ddi_type,
 			dsim->data_lane);
 	if (ret < 0)
 		dsim_dump(dsim);
 
-	dsim->state = DSIM_STATE_ON;
+	enable_irq(dsim->res.irq);
 
+	dsim->state = DSIM_STATE_ON;
 	DPU_EVENT_LOG(DPU_EVT_EXIT_ULPS, &dsim->sd, start);
 err:
 	dsim_dbg("%s -\n", __func__);
-	exynos_ss_printk("%s:state %d: active %d:-\n", __func__,
-				dsim->state, pm_runtime_active(dsim->dev));
 
 	return 0;
 }
