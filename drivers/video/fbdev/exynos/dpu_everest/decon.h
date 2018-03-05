@@ -26,7 +26,8 @@
 #include <media/v4l2-device.h>
 #include <media/videobuf2-core.h>
 #include <soc/samsung/bts.h>
-#if defined(CONFIG_EXYNOS_ITMON)
+//#if defined(CONFIG_EXYNOS_ITMON)
+#if 0
 #include <soc/samsung/exynos-itmon.h>
 #endif
 #if defined(CONFIG_ION_EXYNOS)
@@ -1122,7 +1123,8 @@ struct decon_device {
 
 	atomic_t is_shutdown;
 	bool up_list_saved;
-#if defined(CONFIG_EXYNOS_ITMON)
+//#if defined(CONFIG_EXYNOS_ITMON)
+#if 0
 	struct notifier_block itmon_nb;
 	bool notified;
 #endif
