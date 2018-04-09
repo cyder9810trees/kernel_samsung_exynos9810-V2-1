@@ -1639,6 +1639,7 @@ int decon_reg_wait_update_done_and_mask(u32 id, struct decon_mode_info *psr,
 void decon_reg_set_trigger(u32 id, struct decon_mode_info *psr,
 		enum decon_set_trig en);
 int decon_reg_wait_for_update_timeout(u32 id, unsigned long timeout);
+void decon_reg_set_int(u32 id, struct decon_mode_info *psr, u32 en);
 int decon_reg_get_interrupt_and_clear(u32 id, u32 *ext_irq);
 void decon_reg_set_blender_bg_image_size(u32 id, enum decon_dsi_mode dsi_mode,
 		struct decon_lcd *lcd_info);
