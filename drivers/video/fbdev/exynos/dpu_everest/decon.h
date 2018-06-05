@@ -87,6 +87,7 @@ extern struct decon_bts_ops decon_bts_control;
 #define CHIP_VER	(9810)
 
 #define DECON_WIN_UPDATE_IDX	(6)
+#define MAX_BUF_MEMMAP		512
 
 #ifndef KHZ
 #define KHZ (1000)
@@ -825,6 +826,8 @@ void DPU_EVENT_LOG_APPLY_REGION(struct v4l2_subdev *sd,
 void DPU_EVENT_SHOW(struct seq_file *s, struct decon_device *decon);
 int decon_create_debugfs(struct decon_device *decon);
 void decon_destroy_debugfs(struct decon_device *decon);
+void dpu_memmap_dec(struct decon_device *decon, dma_addr_t target);
+void dpu_memmap_inc(struct decon_device *decon, dma_addr_t target);
 #else /*!*/
 #define DPU_EVENT_START(...) do { } while(0)
 #define DPU_EVENT_LOG(...) do { } while(0)
@@ -836,7 +839,7 @@ void decon_destroy_debugfs(struct decon_device *decon);
 #define DPU_EVENT_LOG_APPLY_REGION(...) do { } while(0)
 #define DPU_EVENT_SHOW(...) do { } while(0)
 #define decon_create_debugfs(...) do { } while(0)
-#define decon_destroy_debugfs(..) do { } while(0)
+#define decon_destroy_debugfs(...) do { } while(0)
 #endif
 
 
@@ -923,6 +926,12 @@ struct dpu_afbc_info {
 	int size[2];
 };
 
+struct dpu_memmap_info {
+	dma_addr_t addr_q;
+	u32 map_cnt;
+	u32 unmap_cnt;
+};
+
 struct decon_debug {
 	void __iomem *eint_pend;
 	struct dentry *debug_root;
@@ -948,6 +957,11 @@ struct decon_debug {
 	struct dpu_afbc_info cur_afbc_info;
 	struct ion_handle *handle[MAX_DECON_WIN][MAX_PLANE_CNT];
 	int prev_vgf_win_id[2];
+#if defined(CONFIG_EXYNOS_MEMMAP_DEBUG)
+ 	struct dentry *debug_memmap_ref_cnt;
+ 	struct dpu_memmap_info mmap_info[MAX_BUF_MEMMAP];
+ 	int addr_n;
+#endif
 };
 
 struct decon_update_regs {
