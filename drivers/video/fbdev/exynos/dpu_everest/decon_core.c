@@ -395,8 +395,10 @@ static void decon_free_unused_buf(struct decon_device *decon,
 
 	decon_info("%s, win[%d]plane[%d]\n", __func__, win, plane);
 
-	if (dma->attachment && dma->dma_addr)
+	if (dma->attachment && dma->dma_addr) {
 		ion_iovmm_unmap(dma->attachment, dma->dma_addr);
+		dpu_memmap_dec(decon, dma->dma_addr);
+	}
 	if (dma->attachment && dma->sg_table)
 		dma_buf_unmap_attachment(dma->attachment,
 				dma->sg_table, DMA_TO_DEVICE);
@@ -420,6 +422,7 @@ static void decon_free_dma_buf(struct decon_device *decon,
 	if (dma->fence)
 		fput(dma->fence->file);
 	ion_iovmm_unmap(dma->attachment, dma->dma_addr);
+	dpu_memmap_dec(decon, dma->dma_addr);
 
 	dma_buf_unmap_attachment(dma->attachment, dma->sg_table,
 			DMA_TO_DEVICE);
@@ -1329,6 +1332,7 @@ static unsigned int decon_map_ion_handle(struct decon_device *decon,
 		decon_err("iovmm_map() failed: %pa\n", &dma->dma_addr);
 		goto err_iovmm_map;
 	}
+	dpu_memmap_inc(decon, dma->dma_addr);
 
 	dma->ion_handle = ion_handle;
 
