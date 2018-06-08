@@ -62,6 +62,12 @@ static int decon2_event_count;
 struct decon_device *decon_drvdata[MAX_DECON_CNT];
 EXPORT_SYMBOL(decon_drvdata);
 
+/*
+ * This variable is moved from decon_ioctl function,
+ * because stack frame of decon_ioctl is over.
+ */
+static struct dpp_restrictions_info disp_res;
+
 static char *decon_state_names[] = {
 	"INIT",
 	"ON",
@@ -2722,6 +2728,7 @@ static int decon_ioctl(struct fb_info *info, unsigned int cmd,
 	struct decon_disp_info __user *argp_info;
 	struct decon_display_mode dm_info;
  	struct decon_reg_data decon_regs;
+	struct dpp_restrictions_info __user *argp_res;
 	int ret = 0;
 	u32 crtc;
 	bool active;
@@ -2729,6 +2736,7 @@ static int decon_ioctl(struct fb_info *info, unsigned int cmd,
 	u32 crc_data[2];
 	u32 pwr_mode;
 	u32 dm_num;
+	int i;
 
 	decon_hiber_block_exit(decon);
 	switch (cmd) {
@@ -3037,6 +3045,23 @@ static int decon_ioctl(struct fb_info *info, unsigned int cmd,
 			break;
 		}
 
+		break;
+
+	case EXYNOS_DISP_RESTRICTIONS:
+		argp_res = (struct dpp_restrictions_info  __user *)arg;
+
+		for (i = 0; i < decon->dt.max_win; ++i)
+			v4l2_subdev_call(decon->dpp_sd[i], core, ioctl,
+					DPP_GET_RESTRICTION, &disp_res.dpp_ch[i]);
+
+		disp_res.ver = DISP_RESTRICTION_VER;
+		disp_res.dpp_cnt = decon->dt.max_win;
+
+		if (copy_to_user(argp_res, &disp_res,
+					sizeof(struct dpp_restrictions_info))) {
+			ret = -EFAULT;
+			break;
+		}
 		break;
 
 	default:
