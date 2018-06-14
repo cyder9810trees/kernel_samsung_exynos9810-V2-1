@@ -93,7 +93,7 @@ static void dpu_bts_sum_all_decon_bw(struct decon_device *decon, u32 ch_bw[])
 static void dpu_bts_find_max_disp_freq(struct decon_device *decon,
 		struct decon_reg_data *regs)
 {
-	int i, idx;
+	int i;
 	u32 disp_ch_bw[BTS_DPU_MAX];
 	u32 max_disp_ch_bw;
 	u32 disp_op_freq = 0, freq = 0;
@@ -137,7 +137,6 @@ static void dpu_bts_find_max_disp_freq(struct decon_device *decon,
 		decon->id, decon->bts.resol_clk);
 
 	for (i = 0; i < MAX_DECON_WIN; ++i) {
-		idx = config[i].idma_type;
 		if (config[i].state != DECON_WIN_STATE_BUFFER)
 			continue;
 
@@ -244,7 +243,12 @@ void dpu_bts_calc_bw(struct decon_device *decon, struct decon_reg_data *regs)
 	memset(&bts_info, 0, sizeof(struct bts_decon_info));
 	for (i = 0; i < MAX_DECON_WIN; ++i) {
 		if (config[i].state == DECON_WIN_STATE_BUFFER) {
-			idx = config[i].idma_type;
+			idx = DPU_CH2DMA(config[i].idma_type); /* ch */
+			/*
+			 * TODO: Array index of bts_info structure uses dma type.
+			 * This array index will be changed to DPP channel number
+			 * in the future.
+			 */
 			bts_info.dpp[idx].used = true;
 		} else {
 			continue;
