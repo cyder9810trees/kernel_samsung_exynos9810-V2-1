@@ -836,7 +836,7 @@ static int decon_set_win_info(struct fb_info *info)
 	win_regs.whole_h = var->yoffset + var->yres;
 	win_regs.offset_x = var->xoffset;
 	win_regs.offset_y = var->yoffset;
-	win_regs.type = decon->dt.dft_ch;
+	win_regs.ch = decon->dt.dft_ch;
 	decon_reg_set_window_control(decon->id, win_no, &win_regs, false);
 
 	decon_hiber_unblock(decon);

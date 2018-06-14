@@ -1459,7 +1459,7 @@ int decon_check_limitation(struct decon_device *decon, int idx,
 		return -EINVAL;
 	}
 
-	if (config->idma_type >= decon->dt.dpp_cnt) { /* ch */
+	if (config->idma_type >= MAX_DECON_DMA_TYPE) { /* ch */
 		decon_err("ch(%d) is wrong\n", config->idma_type);
 		return -EINVAL;
 	}
@@ -2645,7 +2645,7 @@ static void decon_translate_idma2ch(struct decon_device *decon,
 	struct decon_win_config *config;
 	struct decon_win_config *win_config = win_data->config;
 
-	for (i = 0; i < decon->dt.max_win; i++) {
+	for (i = 0; i < MAX_DECON_WIN; i++) {
 		config = &win_config[i];
 
 		switch (config->state) {
