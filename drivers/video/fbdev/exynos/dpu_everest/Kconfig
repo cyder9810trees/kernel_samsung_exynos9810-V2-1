@@ -127,6 +127,11 @@ config EXYNOS_VIRTUAL_DISPLAY
 	bool "Virtual display mode"
 	depends on EXYNOS_EVEREST
 
+config EXYNOS_DECON_DQE
+ 	bool "Samsung Exynos DQE driver"
+ 	depends on EXYNOS_EVEREST
+ 	default y
+
 endif
 
 source "drivers/video/fbdev/exynos/dpu_everest/panels/Kconfig"
