@@ -35,10 +35,5 @@ config TRUSTONIC_TRUSTED_UI_FB_BLANK
     ---help---
     Blank the framebuffer before starting a TUI session
 
-config TRUSTED_UI_TOUCH_ENABLE
-    bool "TBase Trusted UI use touch related code"
-    default y
-    depends on TRUSTONIC_TRUSTED_UI
-
 source "drivers/gud/gud-exynos9810/sec-os-ctrl/Kconfig"
 source "drivers/gud/gud-exynos9810/sec-os-booster/Kconfig"

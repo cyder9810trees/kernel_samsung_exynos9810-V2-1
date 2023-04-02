@@ -23,19 +23,9 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/switch.h>
-
-#include "tui_ioctl.h"
 #include "tlcTui.h"
-#include "mobicore_driver_api.h"
-#include "dciTui.h"
 #include "tui-hal.h"
 #include "build_tag.h"
-
-/*static int tui_dev_major_number = 122; */
-
-/*module_param(tui_dev_major_number, int, 0000); */
-/*MODULE_PARM_DESC(major, */
-/* "The device major number used to register a unique char device driver"); */
 
 /* Static variables */
 static struct cdev tui_cdev;
@@ -45,7 +35,6 @@ struct switch_dev tui_switch;
 int tui_force_close(uint32_t arg)
 {
 	int ret = 0;
-
 	pr_info("Force TUI_IO_NOTIFY %d\n", arg);
 
 	if (tlc_notify_event(arg))
@@ -63,6 +52,11 @@ void tui_cover_mode_set(bool arg)
 }
 EXPORT_SYMBOL(tui_cover_mode_set);
 
+struct device* (dev_tlc_tui) = NULL;
+
+/* Function pointer */
+int (*fptr_get_fd)(u32 buff_id) = NULL;
+
 static long tui_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
 	int ret = -ENOTTY;
@@ -71,11 +65,30 @@ static long tui_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 	if (_IOC_TYPE(cmd) != TUI_IO_MAGIC)
 		return -EINVAL;
 
-	pr_info("t-base-tui module: ioctl 0x%x ", cmd);
+	tui_dev_devel("t-base-tui module: ioctl 0x%x", cmd);
 
 	switch (cmd) {
+	case TUI_IO_SET_RESOLUTION:{
+		struct tlc_tui_resolution_t response;
+		pr_info("TUI_IO_RESOLUTION\n");
+
+		// Read user response
+		if (copy_from_user(&response, uarg, sizeof(response)))
+		    ret = -EFAULT;
+		else
+		    ret = 0;
+
+		pr_info("IOCTL: User completed command w=%d, h=%d.\n",
+								response.width, response.height);
+		ret = tlc_display_cmd(&response);
+
+		if (ret != 0)
+		    return ret;
+		break;
+    }
+
 	case TUI_IO_NOTIFY:
-		pr_info("TUI_IO_NOTIFY\n");
+		tui_dev_devel("TUI_IO_NOTIFY");
 
 		if (tlc_notify_event(arg))
 			ret = 0;
@@ -86,17 +99,16 @@ static long tui_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 	case TUI_IO_WAITCMD: {
 		struct tlc_tui_command_t tui_cmd = {0};
 
-		pr_info("TUI_IO_WAITCMD\n");
+		tui_dev_devel("TUI_IO_WAITCMD");
 
 		ret = tlc_wait_cmd(&tui_cmd);
 		if (ret) {
-			pr_debug("ERROR %s:%d tlc_wait_cmd returned (0x%08X)\n",
-				 __func__, __LINE__, ret);
+			tui_dev_err(ret, "%d tlc_wait_cmd returned", __LINE__);
 			return ret;
 		}
 
 		/* Write command id to user */
-		pr_debug("IOCTL: sending command %d to user.\n", tui_cmd.id);
+		tui_dev_devel("IOCTL: sending command %d to user.", tui_cmd.id);
 
 		if (copy_to_user(uarg, &tui_cmd, sizeof(
 						struct tlc_tui_command_t)))
@@ -110,7 +122,7 @@ static long tui_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 	case TUI_IO_ACK: {
 		struct tlc_tui_response_t rsp_id;
 
-		pr_info("TUI_IO_ACK\n");
+		tui_dev_devel("TUI_IO_ACK");
 
 		/* Read user response */
 		if (copy_from_user(&rsp_id, uarg, sizeof(rsp_id)))
@@ -118,7 +130,7 @@ static long tui_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		else
 			ret = 0;
 
-		pr_debug("IOCTL: User completed command %d.\n", rsp_id.id);
+		tui_dev_devel("IOCTL: User completed command %d.", rsp_id.id);
 		ret = tlc_ack_cmd(&rsp_id);
 		if (ret)
 			return ret;
@@ -126,39 +138,63 @@ static long tui_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 	}
 
 	case TUI_IO_INIT_DRIVER: {
-		pr_info("TUI_IO_INIT_DRIVER\n");
+		tui_dev_devel("TUI_IO_INIT_DRIVER");
 
 		ret = tlc_init_driver();
 		if (ret) {
-			pr_debug("ERROR %s:%d tlc_init_driver returned (0x%08X)\n",
-				 __func__, __LINE__, ret);
+			tui_dev_err(ret, "%d tlc_init_driver() failed",
+				    __LINE__);
 			return ret;
 		}
 		break;
 	}
 
-	//case TUI_IO_DISPLAY_NOTIFY:{
-	case TUI_IO_SET_RESOLUTION:{
-			struct tlc_tui_resolution_t response;
-			//pr_info("TUI_IO_DISPLAY_NOTIFY\n");
-			pr_info("TUI_IO_RESOLUTION\n");
+	/* Ioclt that allows to get buffer info from DrTui
+	 */
+	case TUI_IO_GET_BUFFER_INFO: {
+		tui_dev_devel("TUI_IO_GET_BUFFER_INFO");
 
-			// Read user response
-			if (copy_from_user(&response, uarg, sizeof(response)))
-				ret = -EFAULT;
-			else
-				ret = 0;
-			pr_info("IOCTL: User completed command w=%d, h=%d.\n", response.width, response.height);
-			ret = tlc_display_cmd(&response);
-			if (ret != 0)
-				return ret;
+		/* Get all buffer info received from DrTui through the dci */
+		struct tlc_tui_ioctl_buffer_info buff_info;
+
+		get_buffer_info(&buff_info);
+
+		/* Fill in return struct */
+		if (copy_to_user(uarg, &buff_info, sizeof(buff_info)))
+			ret = -EFAULT;
+		else
+			ret = 0;
+
+		break;
+	}
+
+	/* Ioclt that allows to get the ion buffer f
+	 */
+	case TUI_IO_GET_ION_FD: {
+		tui_dev_devel("TUI_IO_GET_ION_FD");
+
+		/* Get the back buffer id (in the dci, from DrTui) */
+		u32 buff_id = dci->buff_id;
+
+		/* Get the fd of the ion buffer */
+		struct tlc_tui_ioctl_ion_t ion;
+
+		if (fptr_get_fd)
+			ion.buffer_fd = (*fptr_get_fd)(buff_id);
+
+		/* Fill in return struct */
+		if (copy_to_user(uarg, &ion, sizeof(ion))) {
+			ret = -EFAULT;
 			break;
 		}
+		ret = 0;
+		break;
+	}
 
 	default:
-		pr_info("ERROR %s:%d Unknown ioctl (%u)!\n", __func__,
-			__LINE__, cmd);
-		return -ENOTTY;
+		ret = -ENOTTY;
+		tui_dev_err(ret, "%d Unknown ioctl (%u)!", __LINE__, cmd);
+		return ret;
 	}
 
 	return ret;
@@ -168,14 +204,14 @@ atomic_t fileopened;
 
 static int tui_open(struct inode *inode, struct file *file)
 {
-	pr_info("TUI file opened\n");
+	tui_dev_devel("TUI file opened");
 	atomic_inc(&fileopened);
 	return 0;
 }
 
 static int tui_release(struct inode *inode, struct file *file)
 {
-	pr_info("TUI file closed\n");
+	tui_dev_devel("TUI file closed");
 	if (atomic_dec_and_test(&fileopened))
 		tlc_notify_event(NOT_TUI_CANCEL_EVENT);
 
@@ -189,15 +225,26 @@ static const struct file_operations tui_fops = {
 	.compat_ioctl = tui_ioctl,
 #endif
 	.open = tui_open,
-	.release = tui_release
+	.release = tui_release,
 };
 
 /*--------------------------------------------------------------------------- */
+
+static struct device_driver tui_driver = {
+	.name = "Trustonic"
+};
+
+struct device tui_dev = {
+	.driver = &tui_driver
+};
+
 static int __init tlc_tui_init(void)
 {
-	pr_info("Loading t-base-tui module.\n");
-	pr_debug("\n=============== Running TUI Kernel TLC ===============\n");
-	pr_info("%s\n", MOBICORE_COMPONENT_BUILD_TAG);
+	dev_set_name(&tui_dev, "TUI");
+
+	tui_dev_info("Loading t-base-tui module.");
+	tui_dev_devel("=============== Running TUI Kernel TLC ===============");
+	tui_dev_info("%s", MOBICORE_COMPONENT_BUILD_TAG);
 
 	dev_t devno;
 	int err;
@@ -207,7 +254,7 @@ static int __init tlc_tui_init(void)
 
 	err = alloc_chrdev_region(&devno, 0, 1, TUI_DEV_NAME);
 	if (err) {
-		pr_debug("Unable to allocate Trusted UI device number\n");
+		tui_dev_err(err, "Unable to allocate Trusted UI device number");
 		return err;
 	}
 
@@ -217,20 +264,17 @@ static int __init tlc_tui_init(void)
 
 	err = cdev_add(&tui_cdev, devno, 1);
 	if (err) {
-		pr_debug("Unable to add Trusted UI char device\n");
+		tui_dev_err(err, "Unable to add Trusted UI char device");
 		unregister_chrdev_region(devno, 1);
 		return err;
 	}
 
 	tui_class = class_create(THIS_MODULE, "tui_cls");
-	if (IS_ERR(tui_class)) {
-		pr_debug("Failed to create tui class.\n");
-		unregister_chrdev_region(devno, 1);
-		cdev_del(&tui_cdev);
-		return -1;
-	}
 
-	device_create(tui_class, NULL, devno, NULL, TUI_DEV_NAME);
+	dev_tlc_tui = device_create(tui_class, NULL, devno, NULL, TUI_DEV_NAME);
+
+	if (IS_ERR(dev_tlc_tui))
+		return PTR_ERR(dev_tlc_tui);
 
 	if (!hal_tui_init())
 		return -EPERM;
@@ -246,7 +290,7 @@ static int __init tlc_tui_init(void)
 
 static void __exit tlc_tui_exit(void)
 {
-	pr_info("Unloading t-base-tui module.\n");
+	tui_dev_info("Unloading t-base-tui module.");
 	switch_dev_unregister(&tui_switch);
 	unregister_chrdev_region(tui_cdev.dev, 1);
 	cdev_del(&tui_cdev);

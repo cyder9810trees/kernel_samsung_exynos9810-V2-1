@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2013-2017 TRUSTONIC LIMITED
+ * Copyright (c) 2019 TRUSTONIC LIMITED
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -13,11 +13,17 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _MC_LOGGING_H_
-#define _MC_LOGGING_H_
+#ifndef _MC_PROTOCOL_H_
+#define _MC_PROTOCOL_H_
 
-void logging_run(void);
-int logging_init(phys_addr_t *buffer, u32 *size);
-void logging_exit(bool buffer_busy);
+/* Returns 1 to if probe and start are consumed and init should stop */
+int protocol_early_init(int (*probe)(void), int (*start)(void));
+int protocol_init(void);
+void protocol_exit(void);
+int protocol_start(void);
+void protocol_stop(void);
+const char *protocol_vm_id(void);
+bool protocol_is_be(void);
+bool protocol_fe_uses_pages_and_vas(void);
 
-#endif /* _MC_LOGGING_H_ */
+#endif /* _MC_PROTOCOL_H_ */

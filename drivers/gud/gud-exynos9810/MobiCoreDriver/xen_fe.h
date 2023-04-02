@@ -1,5 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2013-2015 TRUSTONIC LIMITED
+ * Copyright (c) 2017-2019 TRUSTONIC LIMITED
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -12,14 +13,23 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __MC_SCHEDULER_H__
-#define __MC_SCHEDULER_H__
+#ifndef _MC_XEN_FE_H_
+#define _MC_XEN_FE_H_
 
-int mc_scheduler_init(void);
-static inline void mc_scheduler_exit(void) {}
-int mc_scheduler_start(void);
-void mc_scheduler_stop(void);
-int mc_scheduler_suspend(void);
-int mc_scheduler_resume(void);
+#include <linux/version.h>
 
-#endif /* __MC_SCHEDULER_H__ */
+#include "main.h"
+#include "client.h"
+#include "protocol_common.h"
+
+#ifdef CONFIG_XEN
+struct tee_protocol_ops *xen_fe_check(void);
+#else
+static inline
+struct tee_protocol_ops *xen_fe_check(void)
+{
+	return NULL;
+}
+#endif
+
+#endif /* _MC_XEN_FE_H_ */

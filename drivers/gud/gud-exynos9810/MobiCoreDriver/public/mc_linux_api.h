@@ -17,16 +17,16 @@
 #include <linux/types.h>
 
 /*
- * Switch TEE active core to core_num, defined as linux
- * core id
+ * set affinity of tee workser threads to big core or default core affinity
  */
-int mc_switch_core(int core_num);
 
-/*
- * Return TEE active core as Linux core id
- */
-int mc_active_core(void);
+#define TEE_WORKER_THREADS_ON_BIG_CORE_ONLY
 
-int mc_switch_core_ctrl(uint32_t core_num, uint32_t ctrl_idx);
+#if defined(TEE_WORKER_THREADS_ON_BIG_CORE_ONLY) 
+#define BIG_CORE_AFFINITY_MASK (0xF0) 
+void set_tee_worker_threads_on_big_core(bool big_core);
+#else
+void set_tee_worker_threads_on_big_core(bool __attribute__((unused))big_core);
+#endif
 
 #endif /* _MC_LINUX_API_H_ */
