@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (c) 2013-2018 TRUSTONIC LIMITED
  * All Rights Reserved.
@@ -11,7 +12,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
 #ifndef __DCITUI_H__
 #define __DCITUI_H__
 
@@ -156,12 +156,12 @@ struct dci_response_t {
 /* DCI buffer */
 struct tui_dci_msg_t {
 	u32 version;
-	u32     nwd_notif; /* Notification from TlcTui to DrTui */
-	struct dci_command_t  cmd_nwd;   /* Command from DrTui to TlcTui */
+	u32 nwd_notif; /* Notification from TlcTui to DrTui */
+	struct dci_command_t cmd_nwd;   /* Command from DrTui to TlcTui */
 	struct dci_response_t nwd_rsp;   /* Response from TlcTui to DrTui */
-	u32     hal_cmd;
-	u32     hal_rsp;
-	u32     buff_id;
+	u32 hal_cmd;
+	u32 hal_rsp;
+	u32 buff_id;
 };
 
 /**

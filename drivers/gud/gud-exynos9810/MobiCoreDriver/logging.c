@@ -92,7 +92,7 @@ static inline void log_char(char ch, u16 source, u32 cpuid)
 	if (ch == '\0')
 		return;
 
-	if (ch == '\n') {
+	if (ch == '\n' || ch == '\r') {
 		log_eol(source, cpuid);
 		return;
 	}

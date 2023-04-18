@@ -101,9 +101,9 @@ static inline long gup_local(struct mm_struct *mm, uintptr_t start,
 
 	if (write)
 		gup_flags |= FOLL_WRITE;
-
-	/* ExySp */
-	gup_flags |= FOLL_CMA;
+	
+	/*ExySp*/
+        gup_flags |= FOLL_CMA;
 
 	return get_user_pages_remote(NULL, mm, start, nr_pages, gup_flags,
 				    0, pages, NULL);
@@ -118,8 +118,8 @@ static inline long gup_local(struct mm_struct *mm, uintptr_t start,
 	if (write)
 		gup_flags |= FOLL_WRITE;
 
-	/* ExySp */
-	gup_flags |= FOLL_CMA;
+	/*ExySp*/
+        gup_flags |= FOLL_CMA;
 
 	return get_user_pages_remote(NULL, mm, start, nr_pages, gup_flags,
 				    pages, NULL);
@@ -134,8 +134,8 @@ static inline long gup_local(struct mm_struct *mm, uintptr_t start,
 	if (write)
 		gup_flags |= FOLL_WRITE;
 
-	/* ExySp */
-	gup_flags |= FOLL_CMA;
+	/*ExySp*/
+        gup_flags |= FOLL_CMA;
 
 	return get_user_pages_remote(NULL, mm, start, nr_pages, gup_flags,
 				    pages, NULL, NULL);
