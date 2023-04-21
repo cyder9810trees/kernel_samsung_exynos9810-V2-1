@@ -39,6 +39,8 @@
 #include "../aod/aod_drv.h"
 #endif
 
+#include "s6e3ha8_crown_irc.h"
+
 #undef __pn_name__
 #define __pn_name__	crown_a3_s0
 
@@ -79,19 +81,6 @@ static u8 crown_a3_s0_hmd_elvss_table[S6E3HA8_HMD_NR_LUMINANCE][1] = {
 #endif /* CONFIG_SUPPORT_HMD */
 
 static u8 crown_a3_s0_gamma_table[S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][S6E3HA8_GAMMA_CMD_CNT - 1];
-static u8 crown_a3_s0_poc_comp_table[S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][2] = {
-	{ 0x0C, 0x68 }, { 0x0C, 0x68 }, { 0x0C, 0x68 }, { 0x0C, 0x68 }, { 0x0C, 0x68 }, { 0x0C, 0x68 }, { 0x0C, 0x68 }, { 0x0C, 0x68 }, { 0x0C, 0x68 }, { 0x0C, 0x68 },
-	{ 0x0C, 0x68 }, { 0x0C, 0x68 }, { 0x0C, 0x68 }, { 0x0C, 0x68 }, { 0x0C, 0x6A }, { 0x0C, 0x6C }, { 0x0C, 0x6E }, { 0x0C, 0x70 }, { 0x0C, 0x72 }, { 0x0C, 0x74 },
-	{ 0x0C, 0x78 }, { 0x0C, 0x7A }, { 0x0C, 0x7E }, { 0x0C, 0x80 }, { 0x0C, 0x84 }, { 0x0C, 0x88 }, { 0x0C, 0x8C }, { 0x0C, 0x90 }, { 0x0C, 0x94 }, { 0x0C, 0x98 },
-	{ 0x0C, 0x9E }, { 0x0C, 0xA4 }, { 0x0C, 0xAA }, { 0x0C, 0xB0 }, { 0x0C, 0xB6 }, { 0x0C, 0xBC }, { 0x0C, 0xC4 }, { 0x0C, 0xCC }, { 0x0C, 0xE0 }, { 0x0C, 0xF4 },
-	{ 0x0D, 0x0C }, { 0x0D, 0x25 }, { 0x0D, 0x3E }, { 0x0D, 0x5B }, { 0x0D, 0x78 }, { 0x0D, 0x85 }, { 0x0D, 0x95 }, { 0x0D, 0xA4 }, { 0x0D, 0xB5 }, { 0x0D, 0xC6 },
-	{ 0x0D, 0xDA }, { 0x0D, 0xED }, { 0x0E, 0x03 }, { 0x0E, 0x19 }, { 0x0E, 0x30 }, { 0x0E, 0x47 }, { 0x0E, 0x5F }, { 0x0E, 0x77 }, { 0x0E, 0x91 }, { 0x0E, 0xAF },
-	{ 0x0E, 0xCC }, { 0x0E, 0xF5 }, { 0x0F, 0x18 }, { 0x0F, 0x3E }, { 0x0F, 0x64 }, { 0x0F, 0x74 }, { 0x0F, 0x84 }, { 0x0F, 0x94 }, { 0x0F, 0xA6 }, { 0x0F, 0xB6 },
-	{ 0x0F, 0xC6 }, { 0x0F, 0xD8 }, { 0x0F, 0xEA }, { 0x0F, 0xFC },
-	/* HBM */
-	{ 0x0F, 0xFF }, { 0x0F, 0xFF }, { 0x0F, 0xFF }, { 0x0F, 0xFF }, { 0x0F, 0xFF }, { 0x0F, 0xFF }, { 0x0F, 0xFF }, { 0x0F, 0xFF }, { 0x0F, 0xFF }, { 0x0F, 0xFF }, 
-	{ 0x0F, 0xFF }, { 0x0F, 0xFF }, 
-};
 
 static u8 crown_a3_s0_aor_table[S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][2] = {
 	{ 0x0B, 0x74 }, { 0x0B, 0x5E }, { 0x0B, 0x40 }, { 0x0B, 0x2C }, { 0x0B, 0x0E }, { 0x0A, 0xF0 }, { 0x0A, 0xD2 }, { 0x0A, 0xB2 }, { 0x0A, 0x94 }, { 0x0A, 0x72 },
@@ -105,10 +94,6 @@ static u8 crown_a3_s0_aor_table[S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][2] = {
 	/* HBM */
 	{ 0x00, 0x0C }, { 0x00, 0x0C }, { 0x00, 0x0C }, { 0x00, 0x0C }, { 0x00, 0x0C }, { 0x00, 0x0C }, { 0x00, 0x0C }, { 0x00, 0x0C }, { 0x00, 0x0C }, { 0x00, 0x0C },
 	{ 0x00, 0x0C }, { 0x00, 0x0C },
-#ifdef CONFIG_LCD_EXTEND_HBM
-	/* EXTEND_HBM */
-	{ 0x00, 0x0C },
-#endif
 };
 
 static u8 crown_a3_s0_mps_table[][1] = { { 0xCC }, { 0xDC } };
@@ -126,10 +111,6 @@ static u8 crown_a3_s0_elvss_table[][S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][1] = {
 		/* HBM */
 		{ 0x23 }, { 0x22 }, { 0x20 }, { 0x1F }, { 0x1E }, { 0x1D }, { 0x1C }, { 0x1B }, { 0x19 }, { 0x18 },
 		{ 0x17 }, { 0x16 },
-#ifdef CONFIG_LCD_EXTEND_HBM
-		/* EXTEND_HBM */
-		{ 0x00 },
-#endif
 	},
 	{
 		/* UNDER_ZERO */
@@ -144,10 +125,6 @@ static u8 crown_a3_s0_elvss_table[][S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][1] = {
 		/* HBM */
 		{ 0x23 }, { 0x22 }, { 0x20 }, { 0x1F }, { 0x1E }, { 0x1D }, { 0x1C }, { 0x1B }, { 0x19 }, { 0x18 },
 		{ 0x17 }, { 0x16 },
-#ifdef CONFIG_LCD_EXTEND_HBM
-		/* EXTEND_HBM */
-		{ 0x00 },
-#endif
 	},
 	{
 		/* UNDER_MINUS_FIFTEEN */
@@ -162,10 +139,6 @@ static u8 crown_a3_s0_elvss_table[][S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][1] = {
 		/* HBM */
 		{ 0x23 }, { 0x22 }, { 0x20 }, { 0x1F }, { 0x1E }, { 0x1D }, { 0x1C }, { 0x1B }, { 0x19 }, { 0x18 },
 		{ 0x17 }, { 0x16 },
-#ifdef CONFIG_LCD_EXTEND_HBM
-		/* EXTEND_HBM */
-		{ 0x00 },
-#endif
 	},
 };
 
@@ -183,10 +156,6 @@ static u8 crown_a3_s0_elvss_temp_table[][S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][1] = 
 		/* HBM */
 		{ 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 },
 		{ 0x0 }, { 0x0 },
-#ifdef CONFIG_LCD_EXTEND_HBM
-		/* EXTEND_HBM */
-		{ 0x0 },
-#endif
 	},
 	{
 		/* UNDER_ZERO */
@@ -201,10 +170,6 @@ static u8 crown_a3_s0_elvss_temp_table[][S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][1] = 
 		/* HBM */
 		{ 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 },
 		{ 0x0 }, { 0x0 },
-#ifdef CONFIG_LCD_EXTEND_HBM
-		/* EXTEND_HBM */
-		{ 0x0 },
-#endif
 	},
 	{
 		/* UNDER_MINUS_FIFTEEN */
@@ -219,10 +184,6 @@ static u8 crown_a3_s0_elvss_temp_table[][S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][1] = 
 		/* HBM */
 		{ 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 }, { 0x0 },
 		{ 0x0 }, { 0x0 },
-#ifdef CONFIG_LCD_EXTEND_HBM
-		/* EXTEND_HBM */
-		{ 0x0 },
-#endif
 	},
 };
 
@@ -247,10 +208,6 @@ static u8 crown_a3_s0_vint_table[][S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][1] = {
 		/* HBM */
 		{ 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x24 }, { 0x25 },
 		{ 0x25 }, { 0x26 },
-#ifdef CONFIG_LCD_EXTEND_HBM
-		/* EXTEND_HBM */
-		{ 0x26 },
-#endif
 	},
 	{
 		/* UNDER_ZERO */
@@ -265,10 +222,6 @@ static u8 crown_a3_s0_vint_table[][S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][1] = {
 		/* HBM */
 		{ 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x24 }, { 0x25 },
 		{ 0x25 }, { 0x26 },
-#ifdef CONFIG_LCD_EXTEND_HBM
-		/* EXTEND_HBM */
-		{ 0x26 },
-#endif
 	},
 	{
 		/* UNDER_MINUS_FIFTEEN */
@@ -283,10 +236,6 @@ static u8 crown_a3_s0_vint_table[][S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][1] = {
 		/* HBM */
 		{ 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x23 }, { 0x24 }, { 0x25 },
 		{ 0x25 }, { 0x26 },
-#ifdef CONFIG_LCD_EXTEND_HBM
-		/* EXTEND_HBM */
-		{ 0x26 },
-#endif
 	},
 };
 
@@ -407,10 +356,6 @@ static u8 crown_a3_s0_irc_table[S6E3HA8_CROWN_TOTAL_NR_LUMINANCE][S6E3HA8_IRC_VA
 	{ 0x25, 0x69, 0xD6, 0x62, 0x06, 0x57, 0x53, 0x89, 0x75, 0x75, 0x75, 0x26, 0x26, 0x26, 0x27, 0x27, 0x27 },
 	{ 0x25, 0x69, 0xD6, 0x62, 0x06, 0x57, 0x53, 0x89, 0x79, 0x79, 0x79, 0x28, 0x28, 0x28, 0x28, 0x28, 0x28 },
 	{ 0x25, 0x69, 0xD6, 0x62, 0x06, 0x57, 0x53, 0x89, 0x7D, 0x7D, 0x7D, 0x2A, 0x2A, 0x2A, 0x29, 0x29, 0x29 },
-#ifdef CONFIG_LCD_EXTEND_HBM
-	/* EXTEND_HBM */
-	{ 0x25, 0x69, 0xD6, 0x62, 0x06, 0x57, 0x53, 0x89, 0x7D, 0x7D, 0x7D, 0x2A, 0x2A, 0x2A, 0x29, 0x29, 0x29 },
-#endif
 };
 
 static u8 crown_a3_s0_dsc_table[][1] = {
@@ -639,7 +584,6 @@ static struct maptbl crown_a3_s0_maptbl[MAX_MAPTBL] = {
 	[GRAM_INV_IMG_MAPTBL] = DEFINE_2D_MAPTBL(crown_a3_s0_gram_inv_img_pattern_table, init_common_table, s6e3ha8_getidx_gram_img_pattern_table, copy_common_maptbl),
 #endif
 	[MCD_RESISTANCE_MAPTBL] = DEFINE_0D_MAPTBL(crown_a3_s0_mcd_resistance_table, init_common_table, NULL, copy_mcd_resistance_maptbl),
-	[POC_COMP_MAPTBL] = DEFINE_2D_MAPTBL(crown_a3_s0_poc_comp_table, init_common_table, getidx_dimming_maptbl, copy_common_maptbl),
 };
 
 /* ===================================================================================== */
@@ -770,12 +714,6 @@ static u8 CROWN_A3_S0_GAMMA[S6E3HA8_GAMMA_CMD_CNT] = {
 	0x00, 0x00, 0x00,
 };
 
-static u8 CROWN_A3_S0_POC_COMP1[] = {
-	0xB1,
-	0x01, 0xAF, 0x54, 0x68, 0xCC, 0x78, 0x30, 0xCC, 0x64, 0xFF
-};
-static u8 CROWN_A3_S0_POC_COMP2[] = { 0xB8, 0x0F, 0xFF };
-
 static u8 CROWN_A3_S0_AOR[] = { 0xB1, 0x00, 0x0C };
 static u8 CROWN_A3_S0_TSET_MPS_ELVSS[] = {
 	0xB5,
@@ -800,8 +738,9 @@ static u8 CROWN_A3_S0_IRC_VALUE[] = {
 	0x32
 };
 static u8 CROWN_A3_S0_IRC_ON[] = { 0xB8, 0x15 };
+#ifdef CONFIG_SUPPORT_HMD
 static u8 CROWN_A3_S0_IRC_OFF[] = { 0xB8, 0x11 };
-
+#endif
 static u8 CROWN_A3_S0_GAMMA_UPDATE_ENABLE[] = { 0xF7, 0x03 };
 static u8 CROWN_A3_S0_ACL_ONOFF[] = { 0x55, 0x00 };
 static u8 CROWN_A3_S0_ACL_CONTROL[] = { 0xB4, 0x00, 0x44, 0x80, 0x65, 0x26, 0x00 };
@@ -813,7 +752,6 @@ static u8 CROWN_A3_S0_PASET[] = { 0x2B, 0x00, 0x00, 0x09, 0xFF };
 #endif
 static u8 CROWN_A3_S0_LPM_AOR[] =  { 0xB1, 0x0B, 0x74 };
 static u8 CROWN_A3_S0_LPM_NIT[] = {0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-static u8 CROWN_A3_S0_LPM_VOLTAGE[] = {0xBB, 0x88, 0x80};
 static u8 CROWN_A3_S0_LPM_MODE[] = { 0x53, 0x00 };
 static u8 CROWN_A3_S0_LPM_OFF_NIT[] = {0xBB, 0x05};
 static u8 CROWN_A3_S0_AVS_ON[] = { 0xFD, 0x03 };
@@ -825,8 +763,6 @@ static u8 CROWN_A3_S0_LPM_OFF_DYN_VLIN[] = { 0xB5, 0x38 };
 static u8 CROWN_A3_S0_EXIT_ALPM[] = {0x53, 0x00};
 
 static u8 CROWN_A3_S0_ISC[] = { 0xF6, 0x43 };
-
-static u8 CROWN_A3_S0_EDGE_DIMMING[] = { 0xC2, 0x09, 0x00, 0xD8, 0xD8, 0xF4, 0xF4 };
 
 static u8 CROWN_A3_S0_MCD_ON_01[] = { 0xF4, 0xFB };
 static u8 CROWN_A3_S0_MCD_ON_02[] = { 0xB1, 0x00, 0x16 };
@@ -980,7 +916,6 @@ static DEFINE_PKTUI(crown_a3_s0_lpm_off_nit, &crown_a3_s0_maptbl[LPM_OFF_MAPTBL]
 static DEFINE_VARIABLE_PACKET(crown_a3_s0_lpm_off_nit, DSI_PKT_TYPE_WR, CROWN_A3_S0_LPM_OFF_NIT, 0);
 static DEFINE_PKTUI(crown_a3_s0_lpm_nit, &crown_a3_s0_maptbl[LPM_NIT_MAPTBL], 1);
 static DEFINE_VARIABLE_PACKET(crown_a3_s0_lpm_nit, DSI_PKT_TYPE_WR, CROWN_A3_S0_LPM_NIT, 0);
-static DEFINE_STATIC_PACKET(crown_a3_s0_lpm_voltage, DSI_PKT_TYPE_WR, CROWN_A3_S0_LPM_VOLTAGE, 0x25);
 static DEFINE_STATIC_PACKET(crown_a3_s0_avs_on, DSI_PKT_TYPE_WR, CROWN_A3_S0_AVS_ON, 0x2B);
 static DEFINE_STATIC_PACKET(crown_a3_s0_avc2_on, DSI_PKT_TYPE_WR, CROWN_A3_S0_AVC2_ON, 0);
 static DEFINE_STATIC_PACKET(crown_a3_s0_avc2_off, DSI_PKT_TYPE_WR, CROWN_A3_S0_AVC2_OFF, 0);
@@ -1024,10 +959,6 @@ static DEFINE_PKTUI(crown_a3_s0_gamma, &crown_a3_s0_maptbl[GAMMA_MAPTBL], 1);
 static DEFINE_VARIABLE_PACKET(crown_a3_s0_gamma, DSI_PKT_TYPE_WR, CROWN_A3_S0_GAMMA, 0);
 static DEFINE_PKTUI(crown_a3_s0_aor, &crown_a3_s0_maptbl[AOR_MAPTBL], 1);
 static DEFINE_VARIABLE_PACKET(crown_a3_s0_aor, DSI_PKT_TYPE_WR, CROWN_A3_S0_AOR, 0);
-
-static DEFINE_STATIC_PACKET(crown_a3_s0_poc_comp1, DSI_PKT_TYPE_WR, CROWN_A3_S0_POC_COMP1, 0x06);
-static DEFINE_PKTUI(crown_a3_s0_poc_comp2, &crown_a3_s0_maptbl[POC_COMP_MAPTBL], 1);
-static DEFINE_VARIABLE_PACKET(crown_a3_s0_poc_comp2, DSI_PKT_TYPE_WR, CROWN_A3_S0_POC_COMP2, 0x53);
 
 static DECLARE_PKTUI(crown_a3_s0_tset_mps_elvss) = {
 	{ .offset = 1, .maptbl = &crown_a3_s0_maptbl[TSET_MAPTBL] },
@@ -1109,7 +1040,9 @@ static DECLARE_PKTUI(crown_a3_s0_irc_value) = {
 };
 static DEFINE_VARIABLE_PACKET(crown_a3_s0_irc_value, DSI_PKT_TYPE_WR, CROWN_A3_S0_IRC_VALUE, S6E3HA8_IRC_VALUE_OFS);
 static DEFINE_STATIC_PACKET(crown_a3_s0_irc_on, DSI_PKT_TYPE_WR, CROWN_A3_S0_IRC_ON, 0);
+#ifdef CONFIG_SUPPORT_HMD
 static DEFINE_STATIC_PACKET(crown_a3_s0_irc_off, DSI_PKT_TYPE_WR, CROWN_A3_S0_IRC_OFF, 0);
+#endif
 static DEFINE_STATIC_PACKET(crown_a3_s0_gamma_update_enable, DSI_PKT_TYPE_WR, CROWN_A3_S0_GAMMA_UPDATE_ENABLE, 0);
 static DEFINE_PKTUI(crown_a3_s0_acl_onoff, &crown_a3_s0_maptbl[ACL_ONOFF_MAPTBL], 1);
 static DEFINE_VARIABLE_PACKET(crown_a3_s0_acl_onoff, DSI_PKT_TYPE_WR, CROWN_A3_S0_ACL_ONOFF, 0);
@@ -1123,8 +1056,6 @@ static DEFINE_VARIABLE_PACKET(crown_a3_s0_acl_control, DSI_PKT_TYPE_WR, CROWN_A3
 static DEFINE_STATIC_PACKET(crown_a3_s0_acl_dim_frm, DSI_PKT_TYPE_WR, CROWN_A3_S0_ACL_DIM_FRM, 0xF);
 
 static DEFINE_STATIC_PACKET(crown_a3_s0_isc, DSI_PKT_TYPE_WR, CROWN_A3_S0_ISC, 3);
-
-static DEFINE_STATIC_PACKET(crown_a3_s0_edge_dimming, DSI_PKT_TYPE_WR, CROWN_A3_S0_EDGE_DIMMING, 0);
 
 static DEFINE_STATIC_PACKET(crown_a3_s0_mcd_on_01, DSI_PKT_TYPE_WR, CROWN_A3_S0_MCD_ON_01, 0);
 static DEFINE_STATIC_PACKET(crown_a3_s0_mcd_on_02, DSI_PKT_TYPE_WR, CROWN_A3_S0_MCD_ON_02, 0);
@@ -1251,7 +1182,6 @@ static void *crown_a3_s0_init_cmdtbl[] = {
 	&KEYINFO(crown_a3_s0_level3_key_disable),
 	&PKTINFO(crown_a3_s0_tsp_hsync),
 	&PKTINFO(crown_a3_s0_isc),
-	&PKTINFO(crown_a3_s0_edge_dimming),
 	&KEYINFO(crown_a3_s0_level2_key_disable),
 	&SEQINFO(crown_a3_s0_seqtbl[PANEL_SET_BL_SEQ]),
 #ifdef CONFIG_EXYNOS_DECON_LCD_COPR
@@ -1312,12 +1242,11 @@ static void *crown_a3_s0_set_bl_cmdtbl[] = {
 	&PKTINFO(crown_a3_s0_acl_onoff),
 	&PKTINFO(crown_a3_s0_irc_value),
 	&PKTINFO(crown_a3_s0_irc_on),
-	&PKTINFO(crown_a3_s0_poc_comp1),
-	&PKTINFO(crown_a3_s0_poc_comp2),
 	&PKTINFO(crown_a3_s0_gamma_update_enable),
 	&KEYINFO(crown_a3_s0_level2_key_disable),
 };
 
+#ifdef CONFIG_SUPPORT_HMD
 static void *crown_a3_s0_hmd_on_cmdtbl[] = {
 	&KEYINFO(crown_a3_s0_level2_key_enable),
 	&PKTINFO(crown_a3_s0_hmd_on_aor),
@@ -1349,6 +1278,7 @@ static void *crown_a3_s0_hmd_bl_cmdtbl[] = {
 	&PKTINFO(crown_a3_s0_gamma_update_enable),
 	&KEYINFO(crown_a3_s0_level2_key_disable),
 };
+#endif
 
 static void *crown_a3_s0_display_on_cmdtbl[] = {
 	&KEYINFO(crown_a3_s0_level1_key_enable),
@@ -1387,7 +1317,6 @@ static void *crown_a3_s0_alpm_enter_cmdtbl[] = {
 	&DLYINFO(crown_a3_s0_wait_1_frame_in_60hz),
 	&KEYINFO(crown_a3_s0_level2_key_enable),
 	&PKTINFO(crown_a3_s0_lpm_nit),
-	&PKTINFO(crown_a3_s0_lpm_voltage),
 	&KEYINFO(crown_a3_s0_level3_key_enable),
 	&PKTINFO(crown_a3_s0_avs_on),
 	&KEYINFO(crown_a3_s0_level3_key_disable),
@@ -1877,6 +1806,9 @@ struct common_panel_info s6e3ha8_crown_a3_s0_preliminary_panel_info = {
 	.vendor = "SDC",
 	.id = 0x900042,
 	.rev = 0,
+	.ddi_props = {
+		.gpara = (DDI_SUPPORT_WRITE_GPARA | DDI_SUPPORT_READ_GPARA),
+	},
 	.maptbl = crown_a3_s0_maptbl,
 	.nr_maptbl = ARRAY_SIZE(crown_a3_s0_maptbl),
 	.seqtbl = crown_a3_s0_seqtbl,
@@ -1915,6 +1847,9 @@ struct common_panel_info s6e3ha8_crown_a3_s0_default_panel_info = {
 	.vendor = "SDC",
 	.id = 0x900043,
 	.rev = 1,
+	.ddi_props = {
+		.gpara = (DDI_SUPPORT_WRITE_GPARA | DDI_SUPPORT_READ_GPARA),
+	},
 	.maptbl = crown_a3_s0_maptbl,
 	.nr_maptbl = ARRAY_SIZE(crown_a3_s0_maptbl),
 	.seqtbl = crown_a3_s0_seqtbl,

@@ -159,12 +159,41 @@ static int dsim_panel_probe(struct dsim_device *dsim)
 	}
 	memcpy(&dsim->lcd_info, lcd_info, sizeof(struct decon_lcd));
 
+#ifdef CONFIG_EXYNOS_ADAPTIVE_FREQ
+	dsim_update_adaptive_freq(dsim, true);
+#else
 	dsim->clks.hs_clk = dsim->lcd_info.hs_clk;
 	dsim->clks.esc_clk = dsim->lcd_info.esc_clk;
+#endif
 	dsim->data_lane_cnt = dsim->lcd_info.data_lane;
 
 	return ret;
 }
+
+
+#ifdef CONFIG_DYNAMIC_FREQ
+static int common_update_lcd_info(struct dsim_device *dsim)
+{
+	int ret;
+	struct decon_lcd *lcd_info;
+
+	ret = dsim_ioctl_panel(dsim, PANEL_IOC_DSIM_PROBE, (void *)&dsim->id);
+	if (ret) {
+		dsim_err("DSIM:ERR:%s:failed to panel dsim probe\n", __func__);
+		return ret;
+	}
+
+	lcd_info = (struct decon_lcd *)v4l2_get_subdev_hostdata(panel_sd);
+	if (IS_ERR_OR_NULL(lcd_info)) {
+		dsim_err("DSIM:ERR:%s:failed to get lcd information\n", __func__);
+		return -EINVAL;
+	}
+	memcpy(&dsim->lcd_info, lcd_info, sizeof(struct decon_lcd));
+
+	return ret;
+}
+#endif
+
 
 static int dsim_panel_get_state(struct dsim_device *dsim)
 {
@@ -172,7 +201,7 @@ static int dsim_panel_get_state(struct dsim_device *dsim)
 
 	ret = dsim_ioctl_panel(dsim, PANEL_IOC_GET_PANEL_STATE, NULL);
 	if (ret) {
-		dsim_err("DSIM:ERR:%s:failed to get panel staten", __func__);
+		dsim_err("DSIM:ERR:%s:failed to get panel state", __func__);
 		return ret;
 	}
 
@@ -185,11 +214,35 @@ static int dsim_panel_get_state(struct dsim_device *dsim)
 	return ret;
 }
 
-int mipi_write(u32 id, u8 cmd_id, const u8 *cmd, u8 offset, int size)
+#ifdef CONFIG_DYNAMIC_FREQ
+static int dsim_panel_get_df_status(struct dsim_device *dsim)
+{
+	int ret = 0;
+	struct df_status_info *df_status;
+
+	ret = dsim_ioctl_panel(dsim, PANEL_IOC_GET_DF_STATUS, NULL);
+	if (ret < 0) {
+		dsim_err("DSIM:ERR:%s:failed to get df status\n", __func__);
+		goto err_get_df;
+	}
+	df_status = (struct df_status_info*)v4l2_get_subdev_hostdata(panel_sd);
+	if (df_status != NULL)
+		dsim->df_status = df_status;
+
+	dsim_info("[DYN_FREQ]:INFO:%s:req,tar,cur:%d,%d:%d\n", __func__,
+		dsim->df_status->request_df, dsim->df_status->target_df,
+		dsim->df_status->current_df);
+err_get_df:
+	return ret;
+}
+#endif
+
+int mipi_write(u32 id, u8 cmd_id, const u8 *cmd, u8 offset, int size, u32 option, bool wakeup)
 {
 	int ret, retry = 3;
 	unsigned long d0;
 	u32 type, d1;
+	bool block = (option & DSIM_OPTION_WAIT_TX_DONE);
 	struct dsim_device *dsim = get_dsim_drvdata(id);
 
 	if (!cmd) {
@@ -205,7 +258,8 @@ int mipi_write(u32 id, u8 cmd_id, const u8 *cmd, u8 offset, int size)
 		type = MIPI_DSI_DSC_PPS;
 		d0 = (unsigned long)cmd;
 		d1 = size;
-	} else if (cmd_id == MIPI_DSI_WR_GEN_CMD) {
+	} else if ((cmd_id == MIPI_DSI_WR_GEN_CMD) ||
+		(cmd_id == MIPI_DSI_WR_CMD_NO_WAKE)) {
 		if (size == 1) {
 			type = MIPI_DSI_DCS_SHORT_WRITE;
 			d0 = (unsigned long)cmd[0];
@@ -223,16 +277,27 @@ int mipi_write(u32 id, u8 cmd_id, const u8 *cmd, u8 offset, int size)
 	mutex_lock(&cmd_lock);
 	while (--retry >= 0) {
 		if (offset > 0) {
-			if (dsim_write_data(dsim,
-						MIPI_DSI_DCS_SHORT_WRITE_PARAM, 0xB0, offset)) {
-				pr_err("%s failed to write gpara %d (retry %d)\n",
-						__func__, offset, retry);
-				dsim_function_reset(dsim);
-				continue;
+			if (option & DSIM_OPTION_POINT_GPARA) {
+				u8 gpara[3] = { 0xB0, offset, cmd[0] };
+				if (dsim_write_data(dsim, MIPI_DSI_DCS_LONG_WRITE,
+							(unsigned long)gpara, ARRAY_SIZE(gpara), false, wakeup)) {
+					pr_err("%s failed to write gpara %d (retry %d)\n",
+							__func__, offset, retry);
+					dsim_function_reset(dsim);
+					continue;
+				}
+			} else {
+				if (dsim_write_data(dsim,
+							MIPI_DSI_DCS_SHORT_WRITE_PARAM, 0xB0, offset, false, wakeup)) {
+					pr_err("%s failed to write gpara %d (retry %d)\n",
+							__func__, offset, retry);
+					dsim_function_reset(dsim);
+					continue;
+				}
 			}
 		}
 
-		if (dsim_write_data(dsim, type, d0, d1)) {
+		if (dsim_write_data(dsim, type, d0, d1, block, wakeup)) {
 			pr_err("%s failed to write cmd %02X size %d(retry %d)\n",
 					__func__, cmd[0], size, retry);
 			dsim_function_reset(dsim);
@@ -257,9 +322,9 @@ error:
 	return ret;
 }
 
-int mipi_read(u32 id, u8 addr, u8 offset, u8 *buf, int size)
+int mipi_read(u32 id, u8 addr, u8 offset, u8 *buf, int size, u32 option)
 {
-	int ret, retry = 5;
+	int ret, retry = 3;
 	struct dsim_device *dsim = get_dsim_drvdata(id);
 
 	if (!buf) {
@@ -270,12 +335,23 @@ int mipi_read(u32 id, u8 addr, u8 offset, u8 *buf, int size)
 	mutex_lock(&cmd_lock);
 	while (--retry >= 0) {
 		if (offset > 0) {
-			if (dsim_write_data(dsim,
-						MIPI_DSI_DCS_SHORT_WRITE_PARAM, 0xB0, offset)) {
-				pr_err("%s failed to write gpara %d (retry %d)\n",
-						__func__, offset, retry);
-				dsim_function_reset(dsim);
-				continue;
+			if (option & DSIM_OPTION_POINT_GPARA) {
+				u8 gpara[3] = { 0xB0, offset, addr };
+				if (dsim_write_data(dsim, MIPI_DSI_DCS_LONG_WRITE,
+							(unsigned long)gpara, ARRAY_SIZE(gpara), false, true)) {
+					pr_err("%s failed to write gpara %d (retry %d)\n",
+							__func__, offset, retry);
+					dsim_function_reset(dsim);
+					continue;
+				}
+			} else {
+				if (dsim_write_data(dsim,
+							MIPI_DSI_DCS_SHORT_WRITE_PARAM, 0xB0, offset, false, true)) {
+					pr_err("%s failed to write gpara %d (retry %d)\n",
+							__func__, offset, retry);
+					dsim_function_reset(dsim);
+					continue;
+				}
 			}
 		}
 
@@ -374,6 +450,14 @@ static int dsim_probe_panel(struct dsim_device *dsim)
 		dsim_err("DSIM:ERR:%s:failed to get panel state\n", __func__);
 		goto do_exit;
 	}
+#ifdef CONFIG_DYNAMIC_FREQ
+	ret = dsim_panel_get_df_status(dsim);
+	if (ret) {
+		dsim_err("DSIM:ERR:%s:failed to get df status\n", __func__);
+		goto do_exit;
+	}
+#endif
+
 
 	return ret;
 
@@ -491,7 +575,7 @@ static int common_lcd_setarea(struct dsim_device *dsim, u32 l, u32 r, u32 t, u32
 	mutex_lock(&cmd_lock);
 	retry = 2;
 	while (dsim_write_data(dsim, MIPI_DSI_DCS_LONG_WRITE,
-				(unsigned long)column, ARRAY_SIZE(column)) != 0) {
+				(unsigned long)column, ARRAY_SIZE(column), false, true) != 0) {
 		dsim_err("failed to write COLUMN_ADDRESS\n");
 		dsim_function_reset(dsim);
 		if (--retry <= 0) {
@@ -503,7 +587,7 @@ static int common_lcd_setarea(struct dsim_device *dsim, u32 l, u32 r, u32 t, u32
 
 	retry = 2;
 	while (dsim_write_data(dsim, MIPI_DSI_DCS_LONG_WRITE,
-				(unsigned long)page, ARRAY_SIZE(page)) != 0) {
+				(unsigned long)page, ARRAY_SIZE(page), true, true) != 0) {
 		dsim_err("failed to write PAGE_ADDRESS\n");
 		dsim_function_reset(dsim);
 		if (--retry <= 0) {
@@ -571,19 +655,6 @@ static int common_lcd_sleepout(struct dsim_device *dsim)
 	return 0;
 }
 
-static int common_lcd_reset(struct dsim_device *dsim)
-{
-	int ret;
-
-	ret = dsim_ioctl_panel(dsim, PANEL_IOC_PANEL_RESET, NULL);
-	if (ret) {
-		dsim_err("DSIM:ERR:%s:failed to sleep out\n", __func__);
-		return ret;
-	}
-
-	return 0;
-}
-
 static int common_lcd_notify(struct dsim_device *dsim, void *data)
 {
 	int ret;
@@ -597,6 +668,7 @@ static int common_lcd_notify(struct dsim_device *dsim, void *data)
 	return 0;
 }
 
+#ifdef CONFIG_SUPPORT_DOZE
 static int common_lcd_doze(struct dsim_device *dsim)
 {
 	int ret;
@@ -622,6 +694,46 @@ static int common_lcd_doze_suspend(struct dsim_device *dsim)
 
 	return 0;
 }
+#endif
+
+#ifdef CONFIG_EXYNOS_ADAPTIVE_FREQ
+static int common_mipi_freq_change(struct dsim_device *dsim)
+{
+	int ret = 0;
+	
+	ret = dsim_ioctl_panel(dsim,
+			PANEL_IOC_MIPI_FREQ_CHANGED, NULL);
+	if (ret) {
+		dsim_err("DSIM:ERR:%s:failed to change freq\n",
+				__func__);
+		return ret;
+	}
+	
+	return ret;
+}
+#endif
+
+
+#ifdef CONFIG_DYNAMIC_FREQ
+static int common_set_df_default(struct dsim_device *dsim)
+{
+	int ret = 0;
+	struct df_status_info *status = dsim->df_status;
+	struct df_dt_info *df_info = &dsim->lcd_info.df_set_info;
+
+	status->target_df = df_info->dft_index;
+	status->current_df = df_info->dft_index;
+
+	if (dsim->df_mode == DSIM_MODE_POWER_OFF) {
+		status->target_df = MAX_DYNAMIC_FREQ;
+		status->current_df = MAX_DYNAMIC_FREQ;
+		status->ffc_df = MAX_DYNAMIC_FREQ;
+	}
+
+	return ret;
+}
+#endif
+
 
 #ifdef CONFIG_SUPPORT_DSU
 static int common_lcd_dsu(struct dsim_device *dsim, int mres_idx)
@@ -640,8 +752,8 @@ static int common_lcd_dsu(struct dsim_device *dsim, int mres_idx)
 dsu_exit:
 	return ret;
 }
-
 #endif
+
 struct dsim_lcd_driver common_mipi_lcd_driver = {
 	.init		= common_lcd_init,
 	.probe		= common_lcd_probe,
@@ -652,14 +764,23 @@ struct dsim_lcd_driver common_mipi_lcd_driver = {
 	.setarea	= common_lcd_setarea,
 	.poweron	= common_lcd_poweron,
 	.poweroff	= common_lcd_poweroff,
-	.reset		= common_lcd_reset,
 	.sleepin	= common_lcd_sleepin,
 	.sleepout	= common_lcd_sleepout,
 	.displayon	= common_lcd_displayon,
 	.notify		= common_lcd_notify,
 	.set_error_cb	= common_lcd_set_error_cb,
+#ifdef CONFIG_SUPPORT_DOZE
 	.doze		= common_lcd_doze,
 	.doze_suspend	= common_lcd_doze_suspend,
+#endif
+#ifdef CONFIG_EXYNOS_ADAPTIVE_FREQ
+	.mipi_freq_change = common_mipi_freq_change,
+#endif
+#ifdef CONFIG_DYNAMIC_FREQ
+	.set_df_default = common_set_df_default,
+	.update_lcd_info = common_update_lcd_info,
+#endif
+
 #ifdef CONFIG_SUPPORT_DSU
 	.mres = common_lcd_dsu,
 #endif

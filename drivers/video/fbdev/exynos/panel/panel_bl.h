@@ -15,13 +15,11 @@
 
 struct panel_info;
 struct panel_device;
+struct panel_irc_info;
+
 
 #undef DEBUG_PAC
 #undef CONFIG_PANEL_BL_USE_BRT_CACHE
-
-#ifndef CONFIG_EXYNOS_DECON_LCD_S6E3HF4
-#define CONFIG_LCD_EXTEND_HBM
-#endif
 
 #ifdef CONFIG_PANEL_BACKLIGHT_PAC_3_0
 #define BRT_SCALE	(100)
@@ -77,6 +75,9 @@ enum {
 };
 
 struct brightness_table {
+	/* brightness to step count between brightness */
+	u32 *step_cnt;
+	u32 sz_step_cnt;
 	/* brightness to step mapping table */
 	u32 *brt_to_step;
 	u32 sz_brt_to_step;
@@ -100,6 +101,10 @@ struct brightness_table {
 	u32 sz_ui_lum;
 	u32 sz_hbm_lum;
 	u32 sz_ext_hbm_lum;
+
+	u32 sz_panel_dim_ui_lum;
+	u32 sz_panel_dim_hbm_lum;
+	u32 sz_panel_dim_ext_hbm_lum;
 	u32 vtotal;
 };
 
@@ -111,9 +116,7 @@ enum panel_bl_hw_type {
 
 enum panel_bl_subdev_type {
 	PANEL_BL_SUBDEV_TYPE_DISP,
-#ifdef CONFIG_SUPPORT_HMD
 	PANEL_BL_SUBDEV_TYPE_HMD,
-#endif
 #ifdef CONFIG_SUPPORT_AOD_BL
 	PANEL_BL_SUBDEV_TYPE_AOD,
 #endif
@@ -130,6 +133,7 @@ struct panel_bl_properties {
 	int brightness_of_step;
 	int acl_pwrsave;
 	int acl_opr;
+	int aor_ratio;
 };
 
 struct panel_bl_sub_dev {
@@ -142,6 +146,12 @@ struct panel_bl_sub_dev {
 	int *brt_cache_tbl;
 	int sz_brt_cache_tbl;
 #endif
+};
+
+struct panel_bl_wq {
+	wait_queue_head_t wait;
+	atomic_t count;
+	struct task_struct *thread;
 };
 
 struct panel_bl_device {
@@ -157,10 +167,12 @@ struct panel_bl_device {
 	bool finger_layer;
 #endif
 	struct timenval tnv[2];
+	struct panel_bl_wq wq;
 };
 
 int panel_bl_probe(struct panel_device *panel);
 int panel_bl_set_brightness(struct panel_bl_device *panel_bl, int id, int force);
+int panel_update_brightness(struct panel_device *panel);
 int get_max_brightness(struct panel_bl_device *panel_bl);
 int get_brightness_pac_step(struct panel_bl_device *panel_bl, int brightness);
 int get_brightness_of_brt_to_step(struct panel_bl_device *panel_bl, int id, int brightness);
@@ -183,10 +195,9 @@ int panel_bl_get_average_and_clear(struct panel_bl_device *panel_bl, size_t inde
 int aor_interpolation(unsigned int *brt_tbl, unsigned int *lum_tbl,
 		u8 (*aor_tbl)[2], int size, int size_ui_lum, u32 vtotal, int brightness);
 int panel_bl_aor_interpolation(struct panel_bl_device *panel_bl,
-		int id, u8(*aor_tbl)[2]);
-int irc_interpolation(unsigned int *brt_tbl, unsigned int *lum_tbl,
-		u8 (*irc_tbl)[MAX_IRC_PARAM], int size, int size_ui_lum,
-		u8 *dst, int brightness);
+		int id, u8 (*aor_tbl)[2]);
 int panel_bl_irc_interpolation(struct panel_bl_device *panel_bl, int id,
-		u8 (*irc_tbl)[MAX_IRC_PARAM], u8 *dst);
+	struct panel_irc_info *irc_info);
+int search_tbl(int *tbl, int sz, enum SEARCH_TYPE type, int value);
+
 #endif /* __PANEL_BL_H__ */

@@ -15,6 +15,9 @@
 void decon_set_cursor_reset(struct decon_device *decon,
 		struct decon_reg_data *regs)
 {
+	if (!decon->cursor.enabled)
+		return;
+
 	mutex_lock(&decon->cursor.lock);
 	decon->cursor.unmask = false;
 	memcpy(&decon->cursor.regs, regs, sizeof(struct decon_reg_data));
@@ -23,6 +26,9 @@ void decon_set_cursor_reset(struct decon_device *decon,
 
 void decon_set_cursor_unmask(struct decon_device *decon, bool unmask)
 {
+	if (!decon->cursor.enabled)
+		return;
+
 	mutex_lock(&decon->cursor.lock);
 	decon->cursor.unmask = unmask;
 	mutex_unlock(&decon->cursor.lock);
@@ -30,6 +36,9 @@ void decon_set_cursor_unmask(struct decon_device *decon, bool unmask)
 
 static void decon_set_cursor_pos(struct decon_device *decon, int x, int y)
 {
+	if (!decon->cursor.enabled)
+		return;
+
 	if (x < 0)
 		x = 0;
 	if (y < 0)
@@ -45,6 +54,11 @@ static int decon_set_cursor_dpp_config(struct decon_device *decon,
 	int i, ret = 0, err_cnt = 0;
 	struct v4l2_subdev *sd;
 	struct decon_win *win;
+	struct dpp_config dpp_config;
+	unsigned long aclk_khz;
+
+	if (!decon->cursor.enabled)
+		return 0;
 
 	if (!regs->is_cursor_win[regs->cursor_win])
 		return -1;
@@ -54,9 +68,14 @@ static int decon_set_cursor_dpp_config(struct decon_device *decon,
 	if (!test_bit(win->dpp_id, &decon->cur_using_dpp))
 		return -2;
 
+	aclk_khz = v4l2_subdev_call(decon->out_sd[0], core, ioctl,
+			EXYNOS_DPU_GET_ACLK, NULL) / 1000U;
+
 	sd = decon->dpp_sd[win->dpp_id];
-	ret = v4l2_subdev_call(sd, core, ioctl,
-			DPP_WIN_CONFIG, &regs->dpp_config[i]);
+	memcpy(&dpp_config.config, &regs->dpp_config[i],
+			sizeof(struct decon_win_config));
+	dpp_config.rcv_num = aclk_khz;
+	ret = v4l2_subdev_call(sd, core, ioctl, DPP_WIN_CONFIG, &dpp_config);
 	if (ret) {
 		decon_err("failed to config (WIN%d : DPP%d)\n",
 						i, win->dpp_id);
@@ -76,7 +95,13 @@ void dpu_cursor_win_update_config(struct decon_device *decon,
 		struct decon_reg_data *regs)
 {
 	struct decon_frame src, dst;
+	struct v4l2_subdev *sd;
+	struct dpp_ch_restriction ch_res;
+	struct dpp_restriction *res;
 	unsigned short cur = regs->cursor_win;
+
+	if (!decon->cursor.enabled)
+		return;
 
 	if (!decon->id) {
 		decon_dbg("%s, decon[%d] is not support cursor a-sync\n",
@@ -84,15 +109,19 @@ void dpu_cursor_win_update_config(struct decon_device *decon,
 		return;
 	}
 	if (!(regs->win_regs[cur].wincon & WIN_EN_F(cur))) {
-		decon_dbg("%s, window[%d] is not enabled\n", __func__, cur);
+		decon_err("%s, window[%d] is not enabled\n", __func__, cur);
 		return;
 	}
 
 	if (!regs->is_cursor_win[cur]) {
-		decon_dbg("%s, window[%d] is not cursor layer\n",
+		decon_err("%s, window[%d] is not cursor layer\n",
 				__func__, cur);
 		return;
 	}
+
+	sd = decon->dpp_sd[0];
+	v4l2_subdev_call(sd, core, ioctl, DPP_GET_RESTRICTION, &ch_res);
+	res = &ch_res.restriction;
 
 	memcpy(&src, &regs->dpp_config[cur].src, sizeof(struct decon_frame));
 	memcpy(&dst, &regs->dpp_config[cur].dst, sizeof(struct decon_frame));
@@ -105,8 +134,8 @@ void dpu_cursor_win_update_config(struct decon_device *decon,
 	if ((dst.y + dst.h) > decon->lcd_info->yres)
 		dst.h = dst.h - ((dst.y + dst.h) - decon->lcd_info->yres);
 
-	if (dst.w > SRC_WIDTH_MAX || dst.w < SRC_WIDTH_MIN ||
-		dst.h > SRC_HEIGHT_MAX || dst.h < SRC_HEIGHT_MIN) {
+	if (dst.w > res->src_f_w.max || dst.w < res->src_f_w.min ||
+		dst.h > res->src_f_h.max || dst.h < res->src_f_h.min) {
 		decon_info("not supported cursor: [%d] [%d %d] ",
 				cur, decon->lcd_info->xres,
 				decon->lcd_info->yres);
@@ -154,6 +183,9 @@ int decon_set_cursor_win_config(struct decon_device *decon, int x, int y)
 
 	DPU_EVENT_START();
 
+	if (!decon->cursor.enabled)
+		return 0;
+
 	decon_set_cursor_pos(decon, x, y);
 
 	mutex_lock(&decon->cursor.lock);
@@ -177,7 +209,7 @@ int decon_set_cursor_win_config(struct decon_device *decon, int x, int y)
 	}
 
 	if (!regs->is_cursor_win[regs->cursor_win]) {
-		decon_dbg("decon%d: cursor win(%d) disable\n",
+		decon_err("decon%d: cursor win(%d) disable\n",
 			decon->id, regs->cursor_win);
 		ret = -EINVAL;
 		goto end;
@@ -199,11 +231,6 @@ int decon_set_cursor_win_config(struct decon_device *decon, int x, int y)
 
 	DPU_EVENT_LOG_CURSOR(&decon->sd, regs);
 
-	/* set decon registers for each window */
-	decon_reg_set_window_control(decon->id, regs->cursor_win,
-				&regs->win_regs[regs->cursor_win],
-				regs->win_regs[regs->cursor_win].winmap_state);
-
 	err_cnt = decon_set_cursor_dpp_config(decon, regs);
 	if (err_cnt) {
 		decon_err("decon%d: cursor win(%d) during dpp_config(err_cnt:%d)\n",
@@ -214,7 +241,12 @@ int decon_set_cursor_win_config(struct decon_device *decon, int x, int y)
 		goto end;
 	}
 
-	decon_reg_update_req_window(decon->id, regs->cursor_win);
+	/* set decon registers for each window */
+	decon_reg_set_window_control(decon->id, regs->cursor_win,
+				&regs->win_regs[regs->cursor_win],
+				regs->win_regs[regs->cursor_win].winmap_state);
+
+	decon_reg_all_win_shadow_update_req(decon->id);
 
 	if (psr.trig_mode == DECON_HW_TRIG)
 		decon_reg_set_trigger(decon->id, &psr, DECON_TRIG_ENABLE);
@@ -228,4 +260,17 @@ end:
 	DPU_EVENT_LOG(DPU_EVT_CURSOR_POS, &decon->sd, start);
 
 	return ret;
+}
+
+void dpu_init_cursor_mode(struct decon_device *decon)
+{
+	decon->cursor.enabled = false;
+
+	if (!IS_ENABLED(CONFIG_EXYNOS_CURSOR)) {
+		decon_info("display doesn't support cursor async mode\n");
+		return;
+	}
+
+	decon->cursor.enabled = true;
+	decon_info("display supports cursor async mode\n");
 }

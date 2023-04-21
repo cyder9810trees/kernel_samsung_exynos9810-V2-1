@@ -424,7 +424,6 @@ struct mdnie_properties {
 	enum HBM hbm;
 	enum HMD_MODE hmd;
 	enum NIGHT_MODE night;
-	enum NIGHT_LEVEL night_level;
 	enum COLOR_LENS color_lens;
 	enum COLOR_LENS_COLOR color_lens_color;
 	enum COLOR_LENS_LEVEL color_lens_level;
@@ -434,6 +433,7 @@ struct mdnie_properties {
 	enum LDU_MODE ldu;
 	enum SCR_WHITE_MODE scr_white_mode;
 	enum TRANS_MODE trans_mode;
+	int night_level;
 
 	/* for color adjustment */
 	u8 scr[MAX_MDNIE_SCR_LEN];
@@ -512,12 +512,12 @@ struct mdnie_info {
 extern int mdnie_probe(struct panel_device *panel, struct mdnie_tune *mdnie_tune);
 extern int mdnie_enable(struct mdnie_info *mdnie);
 extern int mdnie_disable(struct mdnie_info *mdnie);
-extern int mdnie_update(struct mdnie_info *mdnie);
+extern int panel_mdnie_update(struct panel_device *panel);
 #else
 static inline int mdnie_probe(struct panel_device *panel, struct mdnie_tune *mdnie_tune) { return 0; }
 static inline int mdnie_enable(struct mdnie_info *mdnie) { return 0; }
 static inline int mdnie_disable(struct mdnie_info *mdnie) { return 0; }
-static inline int mdnie_update(struct mdnie_info *mdnie) { return 0; }
+static inline int panel_mdnie_update(struct panel_device *panel) { return 0; }
 #endif
 extern struct maptbl *mdnie_find_maptbl(struct mdnie_info *);
 extern struct maptbl *mdnie_find_etc_maptbl(struct mdnie_info *mdnie, int index);

@@ -106,8 +106,9 @@ static int edid_read_block(struct displayport_device *hdev, int block, u8 *buf, 
 
 	print_hex_dump(KERN_INFO, "EDID: ", DUMP_PREFIX_OFFSET, 16, 1,
 					buf, 128, false);
+#if defined(CONFIG_SEC_DISPLAYPORT_LOGGER)
 	dp_print_hex_dump(buf, "EDID: ", 128);
-
+#endif
 	return 0;
 }
 
@@ -278,6 +279,12 @@ void edid_parse_hdmi14_vsdb(unsigned char *edid_ext_blk,
 				&& edid_ext_blk[i + IEEE_OUI_0_BYTE_NUM] == HDMI14_IEEE_OUI_0
 				&& edid_ext_blk[i + IEEE_OUI_1_BYTE_NUM] == HDMI14_IEEE_OUI_1
 				&& edid_ext_blk[i + IEEE_OUI_2_BYTE_NUM] == HDMI14_IEEE_OUI_2) {
+			int vsdb_len = edid_ext_blk[i] & 0x1F;
+
+			/* check the length of vsdb */
+			if (vsdb_len < 8)
+				break;
+
 			displayport_dbg("EDID: find VSDB for HDMI 1.4\n");
 
 			if (edid_ext_blk[i + 8] & VSDB_HDMI_VIDEO_PRESETNT_MASK) {
@@ -292,6 +299,10 @@ void edid_parse_hdmi14_vsdb(unsigned char *edid_ext_blk,
 					vsdb_offset_calc = vsdb_offset_calc - 2;
 					displayport_dbg("EDID: Not support I_LATENCY_FILEDS_PRESETNT in VSDB\n");
 				}
+
+				/* check if vsdb length is enough for vic data */
+				if (vsdb_len < vsdb_offset_calc)
+					break;
 
 				hdmi_vic_len = (edid_ext_blk[i + vsdb_offset_calc]
 						& VSDB_VIC_LENGTH_MASK) >> VSDB_VIC_LENGTH_BIT_POSITION;
@@ -429,8 +440,10 @@ void edid_parse_hdr_metadata(unsigned char *edid_ext_blk,  int block_cnt)
 				displayport->rx_edid_data.eotf);
 
 			if (displayport->rx_edid_data.eotf & SMPTE_ST_2084) {
-				/*displayport->rx_edid_data.hdr_support = 1;*/
-				displayport_info("EDID: SMPTE_ST_2084 support, but not now\n");
+				if (displayport->hdr_test == 1)
+					displayport->rx_edid_data.hdr_support = 1;
+				displayport_info("EDID: SMPTE_ST_2084 support(%d)\n",
+							displayport->rx_edid_data.hdr_support);
 			}
 
 			displayport->rx_edid_data.max_lumi_data =
@@ -447,6 +460,15 @@ void edid_parse_hdr_metadata(unsigned char *edid_ext_blk,  int block_cnt)
 				edid_ext_blk[i + MIN_LUMI_BYTE_NUM];
 			displayport_dbg("EDID: MIN_LUMI = 0x%x\n",
 				displayport->rx_edid_data.min_lumi_data);
+
+			if (displayport->hdr_test == 2) {
+				displayport->rx_edid_data.hdr_support = 1;
+				displayport->rx_edid_data.eotf = 0x5;
+				displayport->rx_edid_data.max_lumi_data = 2;
+				displayport->rx_edid_data.max_average_lumi_data = 58;
+				displayport->rx_edid_data.min_lumi_data = 128;
+				displayport_info("Dummy HDR Metadata Data for test\n");
+			}
 
 			displayport_info("HDR: EOTF(0x%X) ST2084(%u) GAMMA(%s|%s) LUMI(max:%u,avg:%u,min:%u)\n",
 					displayport->rx_edid_data.eotf,
@@ -556,8 +578,7 @@ void edid_check_detail_timing_desc1(struct fb_monspecs *specs, int modedb_len, u
 		return;
 
 	mode = &(specs->modedb[i]);
-
-	pixelclock = (u64)((u32)block[1] << 8 | (u32)block[0]) * 10000;;
+	pixelclock = (u64)((u32)block[1] << 8 | (u32)block[0]) * 10000;
 
 	displayport_info("detail_timing_desc1: %d*%d@%d (%lld, %dps)\n",
 			mode->xres, mode->yres, mode->refresh, pixelclock, mode->pixclock);
@@ -610,27 +631,45 @@ void edid_check_detail_timing_desc1(struct fb_monspecs *specs, int modedb_len, u
 	supported_videos[VDUMMYTIMING].dv_timings.bt.height = mode->yres;
 	supported_videos[VDUMMYTIMING].dv_timings.bt.interlaced = false;
 	supported_videos[VDUMMYTIMING].dv_timings.bt.pixelclock = pixelclock;
-	supported_videos[VDUMMYTIMING].dv_timings.bt.hfrontporch = mode->right_margin;
+	supported_videos[VDUMMYTIMING].dv_timings.bt.hfrontporch = mode->right_margin ? mode->right_margin : 1;
 	supported_videos[VDUMMYTIMING].dv_timings.bt.hsync = mode->hsync_len;
-	supported_videos[VDUMMYTIMING].dv_timings.bt.hbackporch = mode->left_margin;
-	supported_videos[VDUMMYTIMING].dv_timings.bt.vfrontporch = mode->lower_margin;
+	supported_videos[VDUMMYTIMING].dv_timings.bt.hbackporch = mode->left_margin ? mode->left_margin : 1;
+	supported_videos[VDUMMYTIMING].dv_timings.bt.vfrontporch = mode->lower_margin ? mode->lower_margin : 1;
 	supported_videos[VDUMMYTIMING].dv_timings.bt.vsync = mode->vsync_len;
-	supported_videos[VDUMMYTIMING].dv_timings.bt.vbackporch = mode->upper_margin;
+	supported_videos[VDUMMYTIMING].dv_timings.bt.vbackporch = mode->upper_margin ? mode->upper_margin : 1;
 	supported_videos[VDUMMYTIMING].fps = mode->refresh;
 	/*  VSYNC bit and HSYNC bit is reversed at fbmon.c */
 	supported_videos[VDUMMYTIMING].v_sync_pol = (mode->sync & FB_SYNC_HOR_HIGH_ACT) ? SYNC_POSITIVE : SYNC_NEGATIVE;
 	supported_videos[VDUMMYTIMING].h_sync_pol = (mode->sync & FB_SYNC_VERT_HIGH_ACT) ? SYNC_POSITIVE : SYNC_NEGATIVE;
+
 	supported_videos[VDUMMYTIMING].edid_support_match = true;
 	preferred_preset = supported_videos[VDUMMYTIMING].dv_timings;
 
 	displayport_dbg("EDID: modedb : %d*%d@%d (%lld)\n", mode->xres, mode->yres, mode->refresh,
 			supported_videos[VDUMMYTIMING].dv_timings.bt.pixelclock);
-	displayport_dbg("EDID: modedb : %d %d %d  %d %d %d  %d %d %d\n",
+	displayport_info("EDID: modedb : lm(%d) hs(%d) rm(%d)  um(%d) vs(%d) lm(%d)  %d %d pol(%d, v:%d, h:%d)\n",
 			mode->left_margin, mode->hsync_len, mode->right_margin,
 			mode->upper_margin, mode->vsync_len, mode->lower_margin,
-			mode->sync, mode->vmode, mode->flag);
-	displayport_info("EDID: %s edid_support_match = %d\n", supported_videos[VDUMMYTIMING].name,
+			mode->vmode, mode->flag, mode->sync,
+			supported_videos[VDUMMYTIMING].v_sync_pol,
+			supported_videos[VDUMMYTIMING].h_sync_pol);
+	displayport_dbg("EDID: %s edid_support_match = %d\n", supported_videos[VDUMMYTIMING].name,
 			supported_videos[VDUMMYTIMING].edid_support_match);
+}
+
+void edid_check_test_device(struct displayport_device *displayport,
+		struct fb_monspecs *specs)
+{
+	if (!strcmp(specs->monitor, "UNIGRAF TE") || !strcmp(specs->monitor, "UFG DPR-120")
+		|| !strcmp(specs->monitor, "UCD-400 DP") || !strcmp(specs->monitor, "AGILENT ATR")
+		|| !strcmp(specs->monitor, "UFG DP SINK")) {
+		displayport->bist_used = 1;
+		displayport_info("bist enable in %s\n", __func__);
+	}
+	if (displayport->forced_bist == 1 || displayport->forced_bist == 0) {
+		displayport->bist_used = displayport->forced_bist;
+		displayport_info("forced bist enable %d\n", displayport->bist_used);
+	}	
 }
 
 #ifdef FEATURE_SUPPORT_DISPLAYID
@@ -681,8 +720,6 @@ static void edid_mode_displayid_detailed(struct displayid_detailed_timings_1 *ti
 	}
 
 	if (i < supported_videos_pre_cnt) {
-		supported_videos[i].dex_support = supported_videos[i].dex_support;
-		supported_videos[i].ratio = supported_videos[i].ratio;
 
 		if (i > displayport->best_video)
 			displayport->best_video = i;
@@ -865,8 +902,12 @@ int edid_update(struct displayport_device *hdev)
 	fb_edid_to_monspecs(edid, &specs);
 	modedb_len = specs.modedb_len;
 
+	strlcpy(hdev->mon_name, specs.monitor, MON_NAME_LEN);
 	displayport_info("mon name: %s, gamma: %u.%u\n", specs.monitor,
 			specs.gamma / 100, specs.gamma % 100);
+
+	edid_check_test_device(hdev, &specs);
+
 #ifdef CONFIG_SEC_DISPLAYPORT_BIGDATA
 	secdp_bigdata_save_item(BD_SINK_NAME, specs.monitor);
 #endif
@@ -978,27 +1019,20 @@ u32 edid_audio_informs(void)
 {
 	struct displayport_device *displayport = get_displayport_drvdata();
 	u32 value = 0, ch_info = 0;
-	u32 link_rate = displayport_reg_get_link_bw();
+	u32 link_rate = displayport_reg_phy_get_link_bw();
 
 	if (audio_channels > 0)
 		ch_info = audio_channels;
 
-	/* if below conditions does not meet pro audio, then reduce sample frequency.
-	 * 1. current video is not support pro audio
-	 * 2. link rate is below HBR2
-	 * 3. dex setting is not set
-	 * 4. channel is over 2 and under 8.
-	 * 5. channel is 8. And smaple freq is under 192KHz
-	 */
-	if ((!supported_videos[displayport->cur_video].pro_audio_support ||
-				link_rate < LINK_RATE_5_4Gbps || displayport->dex_setting)) {
-		if ((ch_info > FB_AUDIO_1N2CH && ch_info < FB_AUDIO_8CH) ||
-				(ch_info >= FB_AUDIO_8CH && audio_sample_rates < FB_AUDIO_192KHZ)) {
-			displayport_info("reduce SF(pro_aud:%d, link_rate:0x%X, ch:0x%X, sf:0x%X, dex_set:%d)\n",
-					supported_videos[displayport->cur_video].pro_audio_support, link_rate,
-					ch_info, audio_sample_rates, displayport->dex_setting);
-			audio_sample_rates &= 0x7; /* reduce to under 48KHz */
-		}
+	/* support 192KHz sample freq only if current timing supports pro audio */
+	if (supported_videos[displayport->cur_video].pro_audio_support &&
+		link_rate >= LINK_RATE_5_4Gbps &&
+		ch_info >= FB_AUDIO_8CH && audio_sample_rates >= FB_AUDIO_192KHZ) {
+		displayport_info("support pro audio\n");
+	} else {
+		displayport_info("reduce sample freq to 48KHz(lr:0x%X, ch:0x%X, sf:0x%X)\n",
+			link_rate, ch_info, audio_sample_rates);
+		audio_sample_rates &= 0x7; /* reduce to 48KHz */
 	}
 
 	value = ((audio_sample_rates << 19) | (audio_bit_rates << 16) |

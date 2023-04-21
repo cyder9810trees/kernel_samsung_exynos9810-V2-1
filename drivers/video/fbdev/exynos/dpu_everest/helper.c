@@ -12,57 +12,137 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/pm_runtime.h>
-#include <linux/sync_file.h>
 #include <asm/cacheflush.h>
 #include <asm/page.h>
 #if defined(CONFIG_EXYNOS_CONTENT_PATH_PROTECTION)
 #include <linux/smc.h>
 #endif
+#if defined(CONFIG_SUPPORT_LEGACY_ION)
 #include <linux/exynos_iovmm.h>
+#endif
 
 #include "decon.h"
 #include "dsim.h"
 #include "dpp.h"
+#if defined(CONFIG_EXYNOS_DISPLAYPORT)
 #include "displayport.h"
+#endif
 #include "./panels/lcd_ctrl.h"
 #include <video/mipi_display.h>
 #ifdef CONFIG_EXYNOS_COMMON_PANEL
 #include "../panel/panel_drv.h"
 #endif
 
+static int __dpp_match_dev(struct decon_device *decon, struct device *dev)
+{
+	int ret = 0;
+	struct dpp_device *dpp;
+	
+	dpp = (struct dpp_device *)dev_get_drvdata(dev);
+	if (dpp == NULL) {
+		decon_err("DECON:ERR:%s:faield to get dpp data\n", __func__);
+		return -EINVAL;
+	}
+
+	decon->dpp_sd[dpp->id] = &dpp->sd;
+	decon_info("dpp%d sd name(%s) attr(0x%lx)\n", dpp->id,
+		decon->dpp_sd[dpp->id]->name, dpp->attr);
+
+	return ret;
+}
+
+static int __dsim_match_dev(struct decon_device *decon, struct device *dev)
+{
+	int ret = 0;
+	struct dsim_device *dsim;
+	
+	dsim = (struct dsim_device *)dev_get_drvdata(dev);
+	if (dsim == NULL) {
+		decon_err("DECON:ERR:%s:faield to get dsim data\n", __func__);
+		return -EINVAL;
+	}
+
+	decon->dsim_sd[dsim->id] = &dsim->sd;
+	decon_dbg("dsim sd name(%s)\n", dsim->sd.name);
+
+	return ret;
+}
+
+static int __displayport_match_dev(struct decon_device *decon, struct device *dev)
+{
+	int ret = 0;
+	struct displayport_device *displayport;
+
+	displayport = (struct displayport_device *)dev_get_drvdata(dev);
+	if (displayport == NULL) {
+		decon_err("DECON:ERR:%s:faield to get displayport data\n", __func__);
+		return -EINVAL;
+	}
+
+	decon->displayport_sd = &displayport->sd;
+	decon_dbg("displayport sd name(%s)\n", displayport->sd.name);
+
+	return ret;
+}
+
+#ifdef CONFIG_EXYNOS_COMMON_PANEL
+static int __panel_match_dev(struct decon_device *decon, struct device *dev)
+{
+	int ret = 0;
+	struct panel_device *panel;
+
+	panel = (struct panel_device *)dev_get_drvdata(dev);
+	if (panel == NULL) {
+		decon_err("DECON:ERR:%s:failed to get panel data\n", __func__);
+		return -EINVAL;
+	}
+	
+	decon->panel_sd = &panel->sd;
+	decon_info("panel sd name(%s)\n", panel->sd.name);
+
+#ifdef CONFIG_SUPPORT_DISPLAY_PROFILER
+	if (decon->id == 0) {
+		decon->profile_sd = &panel->profiler.sd;
+
+		v4l2_subdev_call(decon->profile_sd, core, ioctl,
+			PROFILE_REG_DECON, NULL);
+	}
+#endif
+	return ret;
+}
+#endif
+
+
+struct dev_match_cb {
+	char *str;
+	int(*cb)(struct decon_device *, struct device *);
+};
+
 static int __dpu_match_dev(struct device *dev, void *data)
 {
-	struct dpp_device *dpp;
-	struct dsim_device *dsim;
-	struct displayport_device *displayport;
-	struct decon_device *decon = (struct decon_device *)data;
+	int i, ret = 0;
+	struct decon_device *decon = (struct decon_device *)data;	
+	struct dev_match_cb cb_tbl[] = {
+		{.str = DPP_MODULE_NAME, .cb = __dpp_match_dev},
+		{.str = DSIM_MODULE_NAME, .cb = __dsim_match_dev},
+		{.str = DISPLAYPORT_MODULE_NAME, .cb = __displayport_match_dev},
 #ifdef CONFIG_EXYNOS_COMMON_PANEL
-	struct panel_device *panel;
+		{.str = PANEL_DRV_NAME, .cb = __panel_match_dev},
 #endif
+	};
 
-	decon_dbg("%s: drvname(%s)\n", __func__, dev->driver->name);
+	decon_info("%s: drvname(%s)\n", __func__, dev->driver->name);
 
-	if (!strcmp(DPP_MODULE_NAME, dev->driver->name)) {
-		dpp = (struct dpp_device *)dev_get_drvdata(dev);
-		decon->dpp_sd[dpp->id] = &dpp->sd;
-		decon_dbg("dpp%d sd name(%s)\n", dpp->id,
-				decon->dpp_sd[dpp->id]->name);
-	} else if (!strcmp(DSIM_MODULE_NAME, dev->driver->name)) {
-		dsim = (struct dsim_device *)dev_get_drvdata(dev);
-		decon->dsim_sd[dsim->id] = &dsim->sd;
-		decon_dbg("dsim sd name(%s)\n", dsim->sd.name);
-	} else if (!strcmp(DISPLAYPORT_MODULE_NAME, dev->driver->name)) {
-		displayport = (struct displayport_device *)dev_get_drvdata(dev);
-		decon->displayport_sd = &displayport->sd;
-		decon_dbg("displayport sd name(%s)\n", displayport->sd.name);
-#ifdef CONFIG_EXYNOS_COMMON_PANEL
-	} else if (!strcmp(PANEL_DRV_NAME, dev->driver->name)) {
-		panel = (struct panel_device *)dev_get_drvdata(dev);
-		decon->panel_sd = &panel->sd;
-		decon_info("panel sd name(%s)\n", panel->sd.name);
-#endif
-	} else {
-		decon_err("failed to get driver name\n");
+	for (i = 0; i < (int)ARRAY_SIZE(cb_tbl); i++) {
+		if (!strcmp(dev->driver->name, cb_tbl[i].str)) {
+			ret = cb_tbl[i].cb(decon, dev);
+			break;
+		}
+	}
+
+	if (i == ARRAY_SIZE(cb_tbl)) {
+		decon_err("DECON:ERR:%s:failed to find matching cb : %s\n",
+			__func__, dev->driver->name);
 	}
 
 	return 0;
@@ -87,6 +167,7 @@ int dpu_get_sd_by_drvname(struct decon_device *decon, char *drvname)
 u32 dpu_translate_fmt_to_dpp(u32 format)
 {
 	switch (format) {
+	/* YUV420 */
 	case DECON_PIXEL_FORMAT_NV12:
 		return DECON_PIXEL_FORMAT_NV21;
 	case DECON_PIXEL_FORMAT_NV21:
@@ -107,6 +188,12 @@ u32 dpu_translate_fmt_to_dpp(u32 format)
 		return DECON_PIXEL_FORMAT_YVU420M;
 	case DECON_PIXEL_FORMAT_YVU420M:
 		return DECON_PIXEL_FORMAT_YUV420M;
+	/* YUV422 */
+	case DECON_PIXEL_FORMAT_NV16:
+		return DECON_PIXEL_FORMAT_NV61;
+	case DECON_PIXEL_FORMAT_NV61:
+		return DECON_PIXEL_FORMAT_NV16;
+	/* RGB32 */
 	case DECON_PIXEL_FORMAT_ARGB_8888:
 		return DECON_PIXEL_FORMAT_BGRA_8888;
 	case DECON_PIXEL_FORMAT_ABGR_8888:
@@ -146,18 +233,30 @@ u32 dpu_get_bpp(enum decon_pixel_format fmt)
 		return 32;
 
 	case DECON_PIXEL_FORMAT_RGBA_5551:
+	case DECON_PIXEL_FORMAT_BGRA_5551:
+	case DECON_PIXEL_FORMAT_ABGR_4444:
+	case DECON_PIXEL_FORMAT_RGBA_4444:
+	case DECON_PIXEL_FORMAT_BGRA_4444:
 	case DECON_PIXEL_FORMAT_RGB_565:
-	case DECON_PIXEL_FORMAT_NV16:
-	case DECON_PIXEL_FORMAT_NV61:
-	case DECON_PIXEL_FORMAT_YVU422_3P:
+	case DECON_PIXEL_FORMAT_BGR_565:
 		return 16;
 
 	case DECON_PIXEL_FORMAT_NV12N_10B:
 	case DECON_PIXEL_FORMAT_NV12M_S10B:
 	case DECON_PIXEL_FORMAT_NV21M_S10B:
+		return 15;
 	case DECON_PIXEL_FORMAT_NV12M_P010:
 	case DECON_PIXEL_FORMAT_NV21M_P010:
-		return 15;
+	case DECON_PIXEL_FORMAT_NV12_P010:
+		return 24;
+
+	/* YUV422 */
+	case DECON_PIXEL_FORMAT_NV16M_P210:
+	case DECON_PIXEL_FORMAT_NV61M_P210:
+		return 32;
+	case DECON_PIXEL_FORMAT_NV16M_S10B:
+	case DECON_PIXEL_FORMAT_NV61M_S10B:
+		return 20;
 
 	case DECON_PIXEL_FORMAT_NV12:
 	case DECON_PIXEL_FORMAT_NV21:
@@ -170,7 +269,14 @@ u32 dpu_get_bpp(enum decon_pixel_format fmt)
 	case DECON_PIXEL_FORMAT_NV12N:
 		return 12;
 
+	/* YUV422 */
+	case DECON_PIXEL_FORMAT_NV16:
+	case DECON_PIXEL_FORMAT_NV61:
+	case DECON_PIXEL_FORMAT_YVU422_3P:
+		return 16;
+
 	default:
+		decon_err("%s: invalid format(%d)\n", __func__, fmt);
 		break;
 	}
 
@@ -190,6 +296,7 @@ int dpu_get_meta_plane_cnt(enum decon_pixel_format format)
 	case DECON_PIXEL_FORMAT_BGRX_8888:
 	case DECON_PIXEL_FORMAT_RGBA_5551:
 	case DECON_PIXEL_FORMAT_RGB_565:
+	case DECON_PIXEL_FORMAT_BGR_565:
 	case DECON_PIXEL_FORMAT_NV12N:
 	case DECON_PIXEL_FORMAT_NV16:
 	case DECON_PIXEL_FORMAT_NV61:
@@ -209,22 +316,33 @@ int dpu_get_meta_plane_cnt(enum decon_pixel_format format)
 	case DECON_PIXEL_FORMAT_ABGR_2101010:
 	case DECON_PIXEL_FORMAT_RGBA_1010102:
 	case DECON_PIXEL_FORMAT_BGRA_1010102:
+	case DECON_PIXEL_FORMAT_NV12_P010:
 		return 1;
 
 	case DECON_PIXEL_FORMAT_NV12M_P010:
 	case DECON_PIXEL_FORMAT_NV21M_P010:
 	case DECON_PIXEL_FORMAT_NV12M_S10B:
 	case DECON_PIXEL_FORMAT_NV21M_S10B:
+	/* 9820 */
+	case DECON_PIXEL_FORMAT_NV16M_P210:
+	case DECON_PIXEL_FORMAT_NV61M_P210:
+	case DECON_PIXEL_FORMAT_NV16M_S10B:
+	case DECON_PIXEL_FORMAT_NV61M_S10B:
 		return 2;
 
 	default:
-		decon_err("invalid format(%d)\n", format);
+		decon_err("%s: invalid format(%d)\n", __func__, format);
 		return -1;
 	}
 }
 
-int dpu_get_plane_cnt(enum decon_pixel_format format, bool is_hdr)
+int dpu_get_plane_cnt(enum decon_pixel_format format, enum dpp_hdr_standard std)
 {
+	bool is_hdr = false;
+
+	if (std == DPP_HDR_ST2084 || std == DPP_HDR_HLG)
+		is_hdr = true;
+
 	switch (format) {
 	case DECON_PIXEL_FORMAT_ARGB_8888:
 	case DECON_PIXEL_FORMAT_ABGR_8888:
@@ -236,6 +354,7 @@ int dpu_get_plane_cnt(enum decon_pixel_format format, bool is_hdr)
 	case DECON_PIXEL_FORMAT_BGRX_8888:
 	case DECON_PIXEL_FORMAT_RGBA_5551:
 	case DECON_PIXEL_FORMAT_RGB_565:
+	case DECON_PIXEL_FORMAT_BGR_565:
 	case DECON_PIXEL_FORMAT_NV12N:
 		return 1;
 
@@ -244,6 +363,7 @@ int dpu_get_plane_cnt(enum decon_pixel_format format, bool is_hdr)
 	case DECON_PIXEL_FORMAT_ABGR_2101010:
 	case DECON_PIXEL_FORMAT_RGBA_1010102:
 	case DECON_PIXEL_FORMAT_BGRA_1010102:
+	case DECON_PIXEL_FORMAT_NV12_P010:
 		if (is_hdr)
 			return 2;
 		else
@@ -261,6 +381,11 @@ int dpu_get_plane_cnt(enum decon_pixel_format format, bool is_hdr)
 	case DECON_PIXEL_FORMAT_NV21M_P010:
 	case DECON_PIXEL_FORMAT_NV12M_S10B:
 	case DECON_PIXEL_FORMAT_NV21M_S10B:
+	/* 9820 */
+	case DECON_PIXEL_FORMAT_NV16M_P210:
+	case DECON_PIXEL_FORMAT_NV61M_P210:
+	case DECON_PIXEL_FORMAT_NV16M_S10B:
+	case DECON_PIXEL_FORMAT_NV61M_S10B:
 		if (is_hdr)
 			return 3;
 		else
@@ -274,7 +399,7 @@ int dpu_get_plane_cnt(enum decon_pixel_format format, bool is_hdr)
 		return 3;
 
 	default:
-		decon_err("invalid format(%d)\n", format);
+		decon_err("%s: invalid format(%d)\n", __func__, format);
 		return 1;
 	}
 }
@@ -282,9 +407,16 @@ int dpu_get_plane_cnt(enum decon_pixel_format format, bool is_hdr)
 u32 dpu_get_alpha_len(int format)
 {
 	switch (format) {
+	case DECON_PIXEL_FORMAT_ARGB_8888:
+	case DECON_PIXEL_FORMAT_ABGR_8888:
 	case DECON_PIXEL_FORMAT_RGBA_8888:
 	case DECON_PIXEL_FORMAT_BGRA_8888:
 		return 8;
+
+	case DECON_PIXEL_FORMAT_ABGR_4444:
+	case DECON_PIXEL_FORMAT_RGBA_4444:
+	case DECON_PIXEL_FORMAT_BGRA_4444:
+		return 4;
 
 	case DECON_PIXEL_FORMAT_ARGB_2101010:
 	case DECON_PIXEL_FORMAT_ABGR_2101010:
@@ -293,11 +425,15 @@ u32 dpu_get_alpha_len(int format)
 		return 2;
 
 	case DECON_PIXEL_FORMAT_RGBA_5551:
+	case DECON_PIXEL_FORMAT_BGRA_5551:
 		return 1;
 
+	case DECON_PIXEL_FORMAT_XRGB_8888:
+	case DECON_PIXEL_FORMAT_XBGR_8888:
 	case DECON_PIXEL_FORMAT_RGBX_8888:
-	case DECON_PIXEL_FORMAT_RGB_565:
 	case DECON_PIXEL_FORMAT_BGRX_8888:
+	case DECON_PIXEL_FORMAT_RGB_565:
+	case DECON_PIXEL_FORMAT_BGR_565:
 		return 0;
 
 	default:
@@ -415,142 +551,6 @@ void decon_to_init_param(struct decon_device *decon, struct decon_param *p)
 			decon->lcd_info->xres, decon->lcd_info->yres);
 }
 
-/* sync fence related functions */
-void decon_create_timeline(struct decon_device *decon, char *name)
-{
-	decon->timeline = sync_timeline_create(name);
-#if defined(CONFIG_DPU_2_0_FENCE)
-	decon->timeline_max = 0;
-#else
-	decon->timeline_max = 1;
-#endif
-	if (decon->dt.out_type == DECON_OUT_WB)
-		decon->timeline_max = 0;
-}
-
-int decon_get_valid_fd(void)
-{
-	int fd = 0;
-	int fd_idx = 0;
-	int unused_fd[FD_TRY_CNT] = {0};
-
-	fd = get_unused_fd_flags(O_CLOEXEC);
-	if (fd < 0)
-		return -EINVAL;
-
-	if (fd < VALID_FD_VAL) {
-		/*
-		 * If fd from get_unused_fd() has value between 0 and 2,
-		 * fd is tried to get value again except current fd vlaue.
-		 */
-		while (fd < VALID_FD_VAL) {
-			decon_dbg("%s, unvalid fd[%d] is assigned to DECON\n",
-					__func__, fd);
-			unused_fd[fd_idx++] = fd;
-			fd = get_unused_fd_flags(O_CLOEXEC);
-			if (fd < 0) {
-				decon_err("%s, unvalid fd[%d]\n", __func__,
-						fd);
-				break;
-			}
-		}
-
-		while (fd_idx-- > 0) {
-			decon_dbg("%s, unvalid fd[%d] is released by DECON\n",
-					__func__, unused_fd[fd_idx]);
-			put_unused_fd(unused_fd[fd_idx]);
-		}
-
-		if (fd < 0)
-			return -EINVAL;
-	}
-	return fd;
-}
-
-#if defined(CONFIG_DPU_2_0_RELEASE_FENCES)
-void decon_create_release_fences(struct decon_device *decon,
-		struct decon_win_config_data *win_data,
-		struct sync_file *sync_file)
-{
-	int i = 0;
-
-	for (i = 0; i < MAX_DECON_WIN; i++) {
-		int state = win_data->config[i].state;
-		int rel_fence = -1;
-
-		if (state == DECON_WIN_STATE_BUFFER) {
-			rel_fence = decon_get_valid_fd();
-			if (rel_fence < 0) {
-				decon_err("%s: failed to get unused fd\n",
-						__func__);
-				goto err;
-			}
-
-			fd_install(rel_fence,
-					get_file(sync_file->file));
-		}
-		win_data->config[i].rel_fence = rel_fence;
-	}
-	return;
-err:
-	while (i-- > 0) {
-		if (win_data->config[i].state == DECON_WIN_STATE_BUFFER) {
-			put_unused_fd(win_data->config[i].rel_fence);
-			win_data->config[i].rel_fence = -1;
-		}
-	}
-	return;
-}
-#endif
-
-int decon_create_fence(struct decon_device *decon, struct sync_file **sync_file)
-{
-	struct sync_pt *pt;
-	int fd = -EMFILE;
-
-	decon->timeline_max++;
-	pt = sync_pt_create(decon->timeline, sizeof(*pt), decon->timeline_max);
-	if (!pt) {
-		decon_err("%s: failed to create sync pt\n", __func__);
-		goto err;
-	}
-
-	*sync_file = sync_file_create(&pt->base);
-	fence_put(&pt->base);
-	if (!(*sync_file)) {
-		decon_err("%s: failed to create sync file\n", __func__);
-		goto err;
-	}
-
-	fd = decon_get_valid_fd();
-	if (fd < 0) {
-		decon_err("%s: failed to get unused fd\n", __func__);
-		fput((*sync_file)->file);
-		goto err;
-	}
-
-	return fd;
-
-err:
-	decon->timeline_max--;
-	return fd;
-}
-
-void decon_wait_fence(struct sync_file *sync_file)
-{
-	int err = sync_file_wait(sync_file, 900);
-	if (err >= 0)
-		return;
-
-	if (err < 0)
-		decon_warn("error waiting on acquire fence: %d\n", err);
-}
-
-void decon_signal_fence(struct decon_device *decon)
-{
-	sync_timeline_signal(decon->timeline, 1);
-}
-
 void dpu_debug_printk(const char *function_name, const char *format, ...)
 {
 	struct va_format vaf;
@@ -588,45 +588,7 @@ void __iomem *dpu_get_sysreg_addr(void)
 		return NULL;
 	}
 
-	decon_dbg("%s: default sysreg value(0x%x)\n", __func__, readl(regs));
-
 	return regs;
-}
-
-/*
- * DMA_CH0 : VGF0/VGF1
- * DMA_CH1 : G0-VG0
- * DMA_CH2 : G1-VG1
-*/
-u32 dpu_dma_type_to_channel(enum decon_idma_type type)
-{
-	u32 ch_id;
-
-	switch (type) {
-	case IDMA_G0:
-		ch_id = 5;
-		break;
-	case IDMA_G1:
-		ch_id = 3;
-		break;
-	case IDMA_VG0:
-		ch_id = 0;
-		break;
-	case IDMA_VG1:
-		ch_id = 4;
-		break;
-	case IDMA_VGF0:
-		ch_id = 1;
-		break;
-	case IDMA_VGF1:
-		ch_id = 2;
-		break;
-	default:
-		decon_dbg("channel(0x%x) is not valid\n", type);
-		return -EINVAL;
-	}
-
-	return ch_id;
 }
 
 #if defined(CONFIG_EXYNOS_CONTENT_PATH_PROTECTION)
@@ -635,23 +597,23 @@ static int decon_get_protect_id(int dma_id)
 	int prot_id = 0;
 
 	switch (dma_id) {
-	case IDMA_G0:
-		prot_id = PROT_G0;
+	case IDMA_GF0:
+		prot_id = PROT_GF0;
 		break;
-	case IDMA_G1:
-		prot_id = PROT_G1;
+	case IDMA_GF1:
+		prot_id = PROT_GF1;
 		break;
-	case IDMA_VG0:
-		prot_id = PROT_VG0;
+	case IDMA_VG:
+		prot_id = PROT_VG;
 		break;
-	case IDMA_VG1:
-		prot_id = PROT_VG1;
+	case IDMA_VGF:
+		prot_id = PROT_VGF;
 		break;
-	case IDMA_VGF0:
-		prot_id = PROT_VGR0;
+	case IDMA_VGS:
+		prot_id = PROT_VGS;
 		break;
-	case IDMA_VGF1:
-		prot_id = PROT_VGRF;
+	case IDMA_VGRFS:
+		prot_id = PROT_VGRFS;
 		break;
 	case ODMA_WB:
 		prot_id = PROT_WB1;
@@ -664,21 +626,22 @@ static int decon_get_protect_id(int dma_id)
 	return prot_id;
 }
 
-static int decon_control_protection(int dma_id, bool en)
+static int decon_control_protection(int ch, bool en)
 {
 	int ret = SUCCESS_EXYNOS_SMC;
 	int prot_id;
 
-	prot_id = decon_get_protect_id(dma_id);
+	/* content protection uses dma type */
+	prot_id = decon_get_protect_id(DPU_CH2DMA(ch));
 	ret = exynos_smc(SMC_PROTECTION_SET, 0, prot_id,
 		(en ? SMC_PROTECTION_ENABLE : SMC_PROTECTION_DISABLE));
 
 	if (ret)
-		decon_err("DMA%d (en=%d): exynos_smc call fail (err=%d)\n",
-			dma_id, en, ret);
+		decon_err("DMA CH%d (en=%d): exynos_smc call fail (err=%d)\n",
+			ch, en, ret);
 	else
-		decon_dbg("DMA%d protection %s\n",
-			dma_id, en ? "enabled" : "disabled");
+		decon_dbg("DMA CH%d protection %s\n",
+			ch, en ? "enabled" : "disabled");
 
 	return ret;
 }
@@ -687,35 +650,35 @@ void decon_set_protected_content(struct decon_device *decon,
 		struct decon_reg_data *regs)
 {
 	bool en;
-	int dma_id, i, ret = 0;
+	int ch, i, ret = 0;
 	u32 change = 0;
 	u32 cur_protect_bits = 0;
 
-	/* IDMA protection configs (G0,G1,VG0,VG1,VGF0,VGF1) */
+	/* IDMA protection configs */
 	for (i = 0; i < decon->dt.max_win; i++) {
 		if (!regs)
 			break;
 
 		cur_protect_bits |=
-			(regs->protection[i] << regs->dpp_config[i].idma_type);
+			(regs->protection[i] << regs->dpp_config[i].idma_type); /* ch */
 	}
 
 	/* ODMA protection config (WB: writeback) */
 	if (decon->dt.out_type == DECON_OUT_WB)
 		if (regs)
-			cur_protect_bits |= (regs->protection[MAX_DECON_WIN] << ODMA_WB);
+			cur_protect_bits |= (regs->protection[decon->dt.max_win] << ODMA_WB);
 
 	if (decon->prev_protection_bitmask != cur_protect_bits) {
 
-		/* apply protection configs for each DMA */
-		for (dma_id = 0; dma_id < MAX_DPP_CNT; dma_id++) {
-			en = cur_protect_bits & (1 << dma_id);
+		/* apply protection configs for each DPP channel */
+		for (ch = 0; ch < decon->dt.dpp_cnt; ch++) {
+			en = cur_protect_bits & (1 << ch);
 
-			change = (cur_protect_bits & (1 << dma_id)) ^
-				(decon->prev_protection_bitmask & (1 << dma_id));
+			change = (cur_protect_bits & (1 << ch)) ^
+				(decon->prev_protection_bitmask & (1 << ch));
 
 			if (change)
-				ret = decon_control_protection(dma_id, en);
+				ret = decon_control_protection(ch, en);
 		}
 	}
 
@@ -724,11 +687,11 @@ void decon_set_protected_content(struct decon_device *decon,
 }
 #endif
 
+#if defined(DPU_DUMP_BUFFER_IRQ)
 /* id : VGF0=0, VGF1=1 */
-void dpu_dump_data_to_console(void *v_addr, int buf_size, int id)
+static void dpu_dump_data_to_console(void *v_addr, int buf_size, int id)
 {
-	dpp_info("=== (IDMA_VGF%d) Frame Buffer Data(128 Bytes) ===\n",
-		id == IDMA_VGF0 ? 0 : 1);
+	dpp_info("=== (CH#%d) Frame Buffer Data(128 Bytes) ===\n", id);
 
 	print_hex_dump(KERN_INFO, "", DUMP_PREFIX_ADDRESS, 32, 4,
 			v_addr, buf_size, false);
@@ -739,83 +702,96 @@ void dpu_dump_afbc_info(void)
 	int i, j;
 	struct decon_device *decon;
 	struct dpu_afbc_info *afbc_info;
+	void *v_addr[MAX_DECON_WIN];
+	int size[MAX_DECON_WIN];
+	int decon_cnt;
 
-	for (i = 0; i < MAX_DECON_CNT; i++) {
+	decon_cnt = get_decon_drvdata(0)->dt.decon_cnt;
+
+	for (i = 0; i < decon_cnt; i++) {
 		decon = get_decon_drvdata(i);
 		if (decon == NULL)
 			continue;
 
 		afbc_info = &decon->d.prev_afbc_info;
 		decon_info("%s: previous AFBC channel information\n", __func__);
-		for (j = 0; j < 2; ++j) { /* VGF0(0), VGF1(1) */
+		for (j = 0; j < decon->dt.max_win; ++j) { /* all the dpp that has afbc */
 			if (!afbc_info->is_afbc[j])
 				continue;
 
-			decon_info("\t[%s] Base(0x%p), KV(0x%p), size(%d)\n",
-					j ? "VGF1" : "VGF0",
-					(void *)afbc_info->dma_addr[j],
-					afbc_info->v_addr[j],
-					afbc_info->size[j]);
+			v_addr[j] = dma_buf_vmap(afbc_info->dma_buf[j]);
+			if (IS_ERR_OR_NULL(v_addr[j])) {
+				decon_err("%s: Failed to get v_addr (err %pK)\n", __func__, v_addr[j]);
+				return;
+			}
+			size[j] = afbc_info->dma_buf[j]->size;
+			decon_info("\t[DMA%d] Base(0x%p), KV(0x%p), size(%d)\n",
+					j, (void *)afbc_info->dma_addr[j],
+					v_addr[j], size[j]);
+			dma_buf_vunmap(afbc_info->dma_buf[j], v_addr[j]);
 		}
 
 		afbc_info = &decon->d.cur_afbc_info;
 		decon_info("%s: current AFBC channel information\n", __func__);
-		for (j = 0; j < 2; ++j) { /* VGF0(0), VGF1(1) */
+		for (j = 0; j < decon->dt.max_win; ++j) { /* all the dpp that has afbc */
 			if (!afbc_info->is_afbc[j])
 				continue;
 
-			decon_info("\t[%s] Base(0x%p), KV(0x%p), size(%d)\n",
-					j ? "VGF1" : "VGF0",
-					(void *)afbc_info->dma_addr[j],
-					afbc_info->v_addr[j],
-					afbc_info->size[j]);
+			v_addr[j] = dma_buf_vmap(afbc_info->dma_buf[j]);
+			if (IS_ERR_OR_NULL(v_addr[j])) {
+				decon_err("%s: Failed to get v_addr (err %pK)\n", __func__, v_addr[j]);
+				return;
+			}
+			size[j] = afbc_info->dma_buf[j]->size;
+			decon_info("\t[DMA%d] Base(0x%p), KV(0x%p), size(%d)\n",
+					j, (void *)afbc_info->dma_addr[j],
+					v_addr[j], size[j]);
+			dma_buf_vunmap(afbc_info->dma_buf[j], v_addr[j]);
 		}
 	}
 }
 
-#if defined(CONFIG_ION_EXYNOS)
 static int dpu_dump_buffer_data(struct dpp_device *dpp)
 {
 	int i;
 	int id_idx = 0;
 	int dump_size = 128;
+	int decon_cnt;
 	struct decon_device *decon;
 	struct dpu_afbc_info *afbc_info;
 
+	decon_cnt = get_decon_drvdata(0)->dt.decon_cnt;
+
 	if (dpp->state == DPP_STATE_ON) {
-		for (i = 0; i < MAX_DECON_CNT; i++) {
+
+		for (i = 0; i < decon_cnt; i++) {
 			decon = get_decon_drvdata(i);
 			if (decon == NULL)
 				continue;
 
-			if (dpp->id == IDMA_VGF1)
-				id_idx = 1;
+			id_idx = dpp->id;
 
 			afbc_info = &decon->d.cur_afbc_info;
 			if (!afbc_info->is_afbc[id_idx])
 				continue;
 
-			if (afbc_info->size[id_idx] > 2048)
+			if (afbc_info->dma_buf[id_idx]->size > 2048)
 				dump_size = 128;
 			else
-				dump_size = afbc_info->size[id_idx] / 16;
+				dump_size = afbc_info->dma_buf[id_idx]->size / 16;
 
 			decon_info("Base(0x%p), KV(0x%p), size(%d)\n",
 				(void *)afbc_info->dma_addr[id_idx],
-				afbc_info->v_addr[id_idx],
-				dump_size);
+				afbc_info->dma_v_addr[id_idx], dump_size);
 
-			if (!afbc_info->v_addr[id_idx])
-				continue;
-
-			dpu_dump_data_to_console(
-				afbc_info->v_addr[id_idx],
-				dump_size, dpp->id);
+			dpu_dump_data_to_console(afbc_info->dma_v_addr[id_idx],
+					dump_size, dpp->id);
 		}
 	}
 
 	return 0;
 }
+#endif
 
 int dpu_sysmmu_fault_handler(struct iommu_domain *domain,
 	struct device *dev, unsigned long iova, int flags, void *token)
@@ -826,18 +802,22 @@ int dpu_sysmmu_fault_handler(struct iommu_domain *domain,
 
 	if (!strcmp(DSIM_MODULE_NAME, dev->driver->name)) {
 		decon = get_decon_drvdata(0);
+#if defined(CONFIG_EXYNOS_DISPLAYPORT)
 	} else if (!strcmp(DISPLAYPORT_MODULE_NAME, dev->driver->name)) {
 		decon = get_decon_drvdata(2);
+#endif
 	} else {
 		decon_err("unknown driver for dpu sysmmu falut handler(%s)\n",
 				dev->driver->name);
 		return -EINVAL;
 	}
 
-	for (i = 0; i < MAX_DPP_SUBDEV; i++) {
+	for (i = 0; i < decon->dt.dpp_cnt; i++) {
 		if (test_bit(i, &decon->prev_used_dpp)) {
 			dpp = get_dpp_drvdata(i);
+#if defined(DPU_DUMP_BUFFER_IRQ)
 			dpu_dump_buffer_data(dpp);
+#endif
 		}
 	}
 
@@ -845,4 +825,35 @@ int dpu_sysmmu_fault_handler(struct iommu_domain *domain,
 
 	return 0;
 }
+
+#if defined(CONFIG_EXYNOS_PD)
+int dpu_pm_domain_check_status(struct exynos_pm_domain *pm_domain)
+{
+	if (!pm_domain || !pm_domain->check_status)
+		return 0;
+
+	if (pm_domain->check_status(pm_domain))
+		return 1;
+	else
+		return 0;
+}
 #endif
+
+void dsim_to_regs_param(struct dsim_device *dsim, struct dsim_regs *regs)
+{
+	regs->regs = dsim->res.regs;
+	regs->ss_regs = dsim->res.ss_regs;
+	regs->phy_regs = dsim->res.phy_regs;
+	regs->phy_regs_ex = dsim->res.phy_regs_ex;
+}
+
+void dpu_save_fence_info(int fd, struct dma_fence *fence,
+		struct dpu_fence_info *fence_info)
+{
+	fence_info->fd = fd;
+	fence_info->context = fence->context;
+	fence_info->seqno = fence->seqno;
+	fence_info->flags = fence->flags;
+	strlcpy(fence_info->name, fence->ops->get_driver_name(fence),
+			MAX_DPU_FENCE_NAME);
+}

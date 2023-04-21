@@ -146,14 +146,14 @@ int mdnie_current_state(struct mdnie_info *mdnie)
 		mdnie_mode = MDNIE_ACCESSIBILITY_MODE;
 	else if (IS_COLOR_LENS_MODE(mdnie))
 		mdnie_mode = MDNIE_COLOR_LENS_MODE;
-	else if (IS_HDR_MODE(mdnie))
-		mdnie_mode = MDNIE_HDR_MODE;
 	else if (IS_HMD_MODE(mdnie))
 		mdnie_mode = MDNIE_HMD_MODE;
 	else if (IS_NIGHT_MODE(mdnie))
 		mdnie_mode = MDNIE_NIGHT_MODE;
 	else if (IS_HBM_MODE(mdnie))
 		mdnie_mode = MDNIE_HBM_MODE;
+	else if (IS_HDR_MODE(mdnie))
+		mdnie_mode = MDNIE_HDR_MODE;
 #if defined(CONFIG_TDMB)
 	else if (IS_DMB_MODE(mdnie))
 		mdnie_mode = MDNIE_DMB_MODE;
@@ -490,9 +490,9 @@ static void mdnie_update_scr_white_mode(struct mdnie_info *mdnie)
 		if ((IS_LDU_MODE(mdnie)) && (mdnie->props.scenario != EBOOK_MODE)) {
 			mdnie->props.scr_white_mode = SCR_WHITE_MODE_ADJUST_LDU;
 		} else if (mdnie->props.update_sensorRGB ||
-				(mdnie->props.mode == AUTO &&
-				(mdnie->props.scenario == BROWSER_MODE ||
-				 mdnie->props.scenario == EBOOK_MODE))) {
+			   (mdnie->props.mode == AUTO &&
+			    (mdnie->props.scenario == BROWSER_MODE ||
+			     mdnie->props.scenario == EBOOK_MODE))) {
 			mdnie->props.scr_white_mode = SCR_WHITE_MODE_SENSOR_RGB;
 			mdnie->props.update_sensorRGB = false;
 		} else if (mdnie->props.scenario <= SCENARIO_MAX &&
@@ -515,11 +515,10 @@ static void mdnie_update_scr_white_mode(struct mdnie_info *mdnie)
 #endif
 }
 
-int mdnie_update(struct mdnie_info *mdnie)
+int panel_mdnie_update(struct panel_device *panel)
 {
 	int ret;
-	struct panel_device *panel =
-		container_of(mdnie, struct panel_device, mdnie);
+	struct mdnie_info *mdnie = &panel->mdnie;
 
 	mutex_lock(&mdnie->lock);
 	if (!IS_MDNIE_ENABLED(mdnie)) {
@@ -547,6 +546,19 @@ int mdnie_update(struct mdnie_info *mdnie)
 #endif
 
 	return 0;
+}
+
+static int mdnie_update(struct mdnie_info *mdnie)
+{
+	int ret;
+	struct panel_device *panel =
+		container_of(mdnie, struct panel_device, mdnie);
+
+	panel_wake_lock(panel);
+	ret = panel_mdnie_update(panel);
+	panel_wake_unlock(panel);
+
+	return ret;
 }
 
 #ifdef MDNIE_SELF_TEST
@@ -609,12 +621,12 @@ static ssize_t mode_store(struct device *dev,
 	if (ret < 0)
 		return ret;
 
-	dev_info(dev, "%s: value=%d\n", __func__, value);
-
 	if (value >= MODE_MAX) {
-		value = STANDARD;
+		dev_err(dev, "%s: invalid value=%d\n", __func__, value);
 		return -EINVAL;
 	}
+
+	dev_info(dev, "%s: value=%d\n", __func__, value);
 
 	mutex_lock(&mdnie->lock);
 	mdnie->props.mode = value;
@@ -636,19 +648,19 @@ static ssize_t scenario_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value = 0;
+	unsigned int value;
 	int ret;
 
 	ret = kstrtouint(buf, 0, &value);
 	if (ret < 0)
 		return ret;
 
-	dev_info(dev, "%s: value=%d\n", __func__, value);
-
 	if (!SCENARIO_IS_VALID(value)) {
-		dev_err(dev, "%s, invalid scenario %d\n", __func__, value);
+		dev_err(dev, "%s: invalid scenario %d\n", __func__, value);
 		return -EINVAL;
 	}
+
+	dev_info(dev, "%s: value=%d\n", __func__, value);
 
 	mutex_lock(&mdnie->lock);
 	mdnie->props.scenario = value;
@@ -677,18 +689,18 @@ static ssize_t accessibility_store(struct device *dev,
 		&value, &s[0], &s[1], &s[2], &s[3],
 		&s[4], &s[5], &s[6], &s[7], &s[8], &s[9], &s[10], &s[11]);
 
-	dev_info(dev, "%s: value: %d, cnt: %d\n", __func__, value, ret);
-
 	if (ret <= 0 || ret > ARRAY_SIZE(s) + 1 ||
 			((ret - 1) > (MAX_MDNIE_SCR_LEN / 2))) {
-		pr_warn("%s, invalid size %d\n", __func__, ret);
-		return ret;
+		dev_err(dev, "%s: invalid size %d\n", __func__, ret);
+		return -EINVAL;
 	}
 
 	if (value < 0 || value >= ACCESSIBILITY_MAX) {
-		pr_warn("%s, unknown accessibility %d\n", __func__, value);
+		dev_err(dev, "%s: unknown accessibility %d\n", __func__, value);
 		return -EINVAL;
 	}
+
+	dev_info(dev, "%s: value: %d, cnt: %d\n", __func__, value, ret);
 
 	mutex_lock(&mdnie->lock);
 	mdnie->props.accessibility = value;
@@ -721,18 +733,19 @@ static ssize_t bypass_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value = 0;
+	unsigned int value;
 	int ret;
 
 	ret = kstrtouint(buf, 0, &value);
-
-	dev_info(dev, "%s: value=%d\n", __func__, value);
-
 	if (ret < 0)
 		return ret;
 
-	if (value >= BYPASS_MAX)
-		value = BYPASS_OFF;
+	if (value >= BYPASS_MAX) {
+		dev_err(dev, "%s: invalid value=%d\n", __func__, value);
+		return -EINVAL;
+	}
+
+	dev_info(dev, "%s: value=%d\n", __func__, value);
 
 	value = (value) ? BYPASS_ON : BYPASS_OFF;
 
@@ -756,7 +769,7 @@ static ssize_t lux_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	int ret, value = 0;
+	int ret, value;
 
 	ret = kstrtoint(buf, 0, &value);
 	if (ret < 0)
@@ -875,15 +888,15 @@ static ssize_t sensorRGB_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int white_red = 0, white_green = 0, white_blue = 0;
+	unsigned int white_red, white_green, white_blue;
 	int ret;
 
 	ret = sscanf(buf, "%d %d %d",
 		&white_red, &white_green, &white_blue);
-	if (ret < 0)
-		return ret;
+	if (ret != 3)
+		return -EINVAL;
 
-	 dev_info(dev, "%s, white_r %d, white_g %d, white_b %d\n",
+	 dev_info(dev, "%s: white_r %d, white_g %d, white_b %d\n",
 			 __func__, white_red, white_green, white_blue);
 
 	if (IS_MDNIE_ENABLED(mdnie)) {
@@ -913,23 +926,23 @@ static ssize_t whiteRGB_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	int wr_offset = 0, wg_offset = 0, wb_offset = 0;
+	int wr_offset, wg_offset, wb_offset;
 	int ret;
 
 	ret = sscanf(buf, "%d %d %d",
 		&wr_offset, &wg_offset, &wb_offset);
-	if (ret < 0)
-		return ret;
+	if (ret != 3)
+		return -EINVAL;
 
 	if (!IS_VALID_WRGB_OFS(wr_offset) ||
 			!IS_VALID_WRGB_OFS(wg_offset) ||
 			!IS_VALID_WRGB_OFS(wb_offset)) {
-		panel_err("%s, invalid offset %d %d %d\n",
+		dev_err(dev, "%s: invalid offset %d %d %d\n",
 				__func__, wr_offset, wg_offset, wb_offset);
 		return -EINVAL;
 	}
 
-	dev_info(dev, "%s, wr_offset %d, wg_offset %d, wb_offset %d\n",
+	dev_info(dev, "%s: wr_offset %d, wg_offset %d, wb_offset %d\n",
 		 __func__, wr_offset, wg_offset, wb_offset);
 
 	mutex_lock(&mdnie->lock);
@@ -955,18 +968,17 @@ static ssize_t night_mode_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	int enable = 0, level = 0, ret;
+	int enable, level, ret;
 
 	ret = sscanf(buf, "%d %d", &enable, &level);
+	if (ret != 2)
+		return -EINVAL;
+
+	if (level < 0 || level >= mdnie->props.num_night_level)
+		return -EINVAL;
 
 	dev_info(dev, "%s: night_mode %s level %d\n",
 			__func__, enable ? "on" : "off", level);
-
-	if (ret < 0)
-		return ret;
-
-	if (level < 0 || level >= MAX_NIGHT_LEVEL)
-		return -EINVAL;
 
 	mutex_lock(&mdnie->lock);
 	mdnie->props.night = !!enable;
@@ -996,21 +1008,20 @@ static ssize_t color_lens_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	int enable = 0, level = 0, color = 0, ret;
+	int enable, level, color, ret;
 
 	ret = sscanf(buf, "%d %d %d", &enable, &color, &level);
-
-	dev_info(dev, "%s: color_lens_mode %s color %d level %d\n",
-			__func__, enable ? "on" : "off", color, level);
-
-	if (ret < 0)
-		return ret;
+	if (ret != 3)
+		return -EINVAL;
 
 	if (color < 0 || color >= COLOR_LENS_COLOR_MAX)
 		return -EINVAL;
 
 	if (level < 0 || level >= COLOR_LENS_LEVEL_MAX)
 		return -EINVAL;
+
+	dev_info(dev, "%s: color_lens_mode %s color %d level %d\n",
+			__func__, enable ? "on" : "off", color, level);
 
 	mutex_lock(&mdnie->lock);
 	mdnie->props.color_lens = !!enable;
@@ -1038,18 +1049,19 @@ static ssize_t hdr_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value = 0;
+	unsigned int value;
 	int ret;
 
 	ret = kstrtouint(buf, 0, &value);
-
-	dev_info(dev, "%s: value=%d\n", __func__, value);
-
 	if (ret < 0)
 		return ret;
 
-	if (value >= HDR_MAX)
+	if (value >= HDR_MAX) {
+		dev_err(dev, "%s: invalid value=%d\n", __func__, value);
 		return -EINVAL;
+	}
+
+	dev_info(dev, "%s: value=%d\n", __func__, value);
 
 	mutex_lock(&mdnie->lock);
 	mdnie->props.hdr = value;
@@ -1071,18 +1083,17 @@ static ssize_t light_notification_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value = 0;
+	unsigned int value;
 	int ret;
 
 	ret = kstrtouint(buf, 0, &value);
-
-	dev_info(dev, "%s: value=%d\n", __func__, value);
-
 	if (ret < 0)
 		return ret;
 
 	if (value >= LIGHT_NOTIFICATION_MAX)
 		return -EINVAL;
+
+	dev_info(dev, "%s: value=%d\n", __func__, value);
 
 	mutex_lock(&mdnie->lock);
 	mdnie->props.light_notification = value;
@@ -1105,19 +1116,19 @@ static ssize_t mdnie_ldu_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	int value = 0, ret;
+	int value, ret;
 
 	ret = kstrtoint(buf, 10, &value);
-
-	pr_info("%s, value=%d\n", __func__, value);
-
 	if (ret < 0)
 		return ret;
 
 	if (value < 0 || value >= MAX_LDU_MODE) {
-		pr_err("%s, out of range %d\n", __func__, value);
+		dev_err(dev, "%s: out of range %d\n",
+				__func__, value);
 		return -EINVAL;
 	}
+
+	dev_info(dev, "%s: value=%d\n", __func__, value);
 
 	mutex_lock(&mdnie->lock);
 	mdnie->props.ldu = value;
@@ -1140,18 +1151,20 @@ static ssize_t hmt_color_temperature_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value = 0;
+	unsigned int value;
 	int ret;
 
 	ret = kstrtouint(buf, 0, &value);
 	if (ret < 0)
 		return ret;
 
-	if (value > HMD_MDNIE_MAX)
+	if (value >= HMD_MDNIE_MAX)
 		return -EINVAL;
 
 	if (value == mdnie->props.hmd)
 		return count;
+
+	dev_info(dev, "%s: value=%d\n", __func__, value);
 
 	mutex_lock(&mdnie->lock);
 	mdnie->props.hmd = value;
@@ -1192,13 +1205,13 @@ static ssize_t afc_store(struct device *dev,
 		&value, &s[0], &s[1], &s[2], &s[3],
 		&s[4], &s[5], &s[6], &s[7], &s[8], &s[9], &s[10], &s[11]);
 
-	dev_info(dev, "%s: value: %d, cnt: %d\n", __func__, value, ret);
-
 	if ((ret != 1 && ret != ARRAY_SIZE(s) + 1) ||
 			ARRAY_SIZE(s) != MAX_AFC_ROI_LEN) {
-		pr_warn("%s, invalid size %d\n", __func__, ret);
+		dev_err(dev, "%s: invalid size %d\n", __func__, ret);
 		return -EINVAL;
 	}
+
+	dev_info(dev, "%s: value=%d, cnt=%d\n", __func__, value, ret);
 
 	mutex_lock(&mdnie->lock);
 	mdnie->props.afc_on = !!value;
@@ -1237,6 +1250,9 @@ struct device_attribute mdnie_dev_attrs[] = {
 
 int mdnie_enable(struct mdnie_info *mdnie)
 {
+	struct panel_device *panel =
+		container_of(mdnie, struct panel_device, mdnie);
+
 	if (IS_MDNIE_ENABLED(mdnie)) {
 		dev_info(mdnie->dev, "mdnie already enabled\n");
 		return 0;
@@ -1248,7 +1264,7 @@ int mdnie_enable(struct mdnie_info *mdnie)
 	if (IS_HBM_MODE(mdnie))
 		mdnie->props.trans_mode = TRANS_ON;
 	mutex_unlock(&mdnie->lock);
-	mdnie_update(mdnie);
+	panel_mdnie_update(panel);
 	mutex_lock(&mdnie->lock);
 	mdnie->props.trans_mode = TRANS_ON;
 	mutex_unlock(&mdnie->lock);
@@ -1548,7 +1564,7 @@ int mdnie_probe(struct panel_device *panel, struct mdnie_tune *mdnie_tune)
 	for (i = 0; i < ARRAY_SIZE(mdnie_dev_attrs); i++) {
 		ret = device_create_file(mdnie->dev, &mdnie_dev_attrs[i]);
 		if (ret < 0) {
-			dev_err(mdnie->dev, "%s, failed to add %s sysfs entries, %d\n",
+			dev_err(mdnie->dev, "%s: failed to add %s sysfs entries, %d\n",
 					__func__, mdnie_dev_attrs[i].attr.name, ret);
 			goto error2;
 		}

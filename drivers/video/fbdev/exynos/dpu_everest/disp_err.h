@@ -1,5 +1,5 @@
 /*
- * linux/drivers/video/fbdev/exynos/dpu_everest/disp_err.h
+ * linux/drivers/video/fbdev/exynos/dpu_9810/disp_err.h
  *
  * Source file for display error info
  *
@@ -46,9 +46,12 @@ struct disp_error_cb_info {
 #define DEFINE_DISP_ERROR_CB_INFO(name, cb_func, cb_data) \
 	struct disp_error_cb_info name = __DISP_ERROR_CB_INFO_INITIALIZER(cb_func, cb_data)
 
-#define DISP_ERROR_CB_RETRY_CNT	(5)
-#define DISP_CHECK_STATUS_NOK	(0)
-#define DISP_CHECK_STATUS_OK	(1)
+#define DISP_ERROR_CB_RETRY_CNT	(1)
+#define DISP_CHECK_STATUS_OK	(0)
+#define DISP_CHECK_STATUS_NODEV	(1 << 0)	/* UB_CON_DET */
+#define DISP_CHECK_STATUS_ELOFF	(1 << 1)	/* DISP_DET */
+#define IS_DISP_CHECK_STATUS_DISCONNECTED(_status_) ((_status_) & (DISP_CHECK_STATUS_NODEV))
+#define IS_DISP_CHECK_STATUS_NOK(_status_) ((_status_) != (DISP_CHECK_STATUS_OK))
 
 static inline int disp_check_status(struct disp_check_cb_info *info)
 {
