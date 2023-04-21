@@ -33,8 +33,6 @@
 
 #if defined(CONFIG_SOC_EXYNOS9810)
 #include "./cal_9810/regs-displayport.h"
-#elif defined(CONFIG_SOC_EXYNOS9820)
-#include "./cal_9820/regs-displayport.h"
 #endif
 
 #include "secdp_unit_test.h"

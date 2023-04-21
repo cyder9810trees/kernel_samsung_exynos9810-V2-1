@@ -998,13 +998,6 @@ static irqreturn_t dma_irq_handler(int irq, void *priv)
 					ktime_set(0, 0));
 			goto irq_end;
 		}
-#if defined(CONFIG_SOC_EXYNOS9820)
-		/* TODO: SoC dependency will be removed */
-		if (irqs & IDMA_AFBC_CONFLICT_IRQ) {
-			dpp_err("dma%d AFBC conflict irq occurs\n", dpp->id);
-			goto irq_end;
-		}
-#endif
 	}
 
 irq_end:

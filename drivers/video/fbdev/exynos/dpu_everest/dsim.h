@@ -23,12 +23,6 @@
 #if defined(CONFIG_SOC_EXYNOS9810)
 #include "./cal_9810/regs-dsim.h"
 #include "./cal_9810/dsim_cal.h"
-#elif defined(CONFIG_SOC_EXYNOS9820)
-#include "./cal_9820/regs-dsim.h"
-#include "./cal_9820/dsim_cal.h"
-#elif defined(CONFIG_SOC_EXYNOS9110)
-#include "./cal_9110/regs-dsim.h"
-#include "./cal_9110/dsim_cal.h"
 #endif
 
 #if defined(CONFIG_EXYNOS_COMMON_PANEL)

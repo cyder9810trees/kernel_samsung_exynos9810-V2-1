@@ -46,8 +46,6 @@
 #endif
 #if defined(CONFIG_SOC_EXYNOS9810)
 #include <dt-bindings/clock/exynos9810.h>
-#elif defined(CONFIG_SOC_EXYNOS9820)
-#include <dt-bindings/clock/exynos9820.h>
 #endif
 #ifdef CONFIG_SEC_DEBUG
 #include <linux/sec_debug.h>

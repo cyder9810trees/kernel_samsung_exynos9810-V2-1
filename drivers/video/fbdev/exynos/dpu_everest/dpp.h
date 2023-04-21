@@ -36,12 +36,6 @@
 #if defined(CONFIG_SOC_EXYNOS9810)
 #include "./cal_9810/regs-dpp.h"
 #include "./cal_9810/dpp_cal.h"
-#elif defined(CONFIG_SOC_EXYNOS9820)
-#include "./cal_9820/regs-dpp.h"
-#include "./cal_9820/dpp_cal.h"
-#elif defined(CONFIG_SOC_EXYNOS9110)
-#include "./cal_9110/regs-dpp.h"
-#include "./cal_9110/dpp_cal.h"
 #endif
 #ifdef CONFIG_EXYNOS_MCD_HDR
 #include "./mcd_hdr/hdr_drv.h"

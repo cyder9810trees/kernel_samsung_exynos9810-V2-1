@@ -32,8 +32,6 @@
 #endif
 #if defined(CONFIG_SOC_EXYNOS9810)
 #include <dt-bindings/clock/exynos9810.h>
-#elif defined(CONFIG_SOC_EXYNOS9820)
-#include <dt-bindings/clock/exynos9820.h>
 #endif
 #if defined(CONFIG_CPU_IDLE)
 #include <soc/samsung/exynos-cpupm.h>
@@ -1119,10 +1117,6 @@ static int dsim_s_stream(struct v4l2_subdev *sd, int enable)
 static int dsim_set_pre_freq_hop(struct dsim_device *dsim, struct df_param *param)
 {
 	int ret = 0;
-	
-#if defined(CONFIG_SOC_EXYNOS9820_EVT0)
-	return ret;
-#endif
 
 	if (param->context)
 		dsim_dbg("[DYN_FREQ]:INFO:%s:p,m,k:%d,%d,%d\n", 
@@ -1141,10 +1135,6 @@ static int dsim_set_post_freq_hop(struct dsim_device *dsim, struct df_param *par
 {
 	int ret = 0;
 
-#if defined(CONFIG_SOC_EXYNOS9820_EVT0)
-	return ret;
-#endif
-
 	if (param->context)
 		dsim_dbg("[DYN_FREQ]:INFO:%s:p,m,k:%d,%d,%d\n", 
 			__func__, param->pms.p, param->pms.m, param->pms.k);
@@ -1158,7 +1148,6 @@ static int dsim_set_post_freq_hop(struct dsim_device *dsim, struct df_param *par
 
 static int dsim_set_freq_hop(struct dsim_device *dsim, struct decon_freq_hop *freq)
 {
-#if !defined(CONFIG_SOC_EXYNOS9820_EVT0)
 	struct stdphy_pms *pms;
 
 	if (!IS_DSIM_ON_STATE(dsim)) {
@@ -1170,7 +1159,6 @@ static int dsim_set_freq_hop(struct dsim_device *dsim, struct decon_freq_hop *fr
 	/* If target M value is 0, frequency hopping will be disabled */
 	dsim_reg_set_dphy_freq_hopping(dsim->id, pms->p, freq->target_m,
 			freq->target_k, (freq->target_m > 0) ? 1 : 0);
-#endif
 
 	return 0;
 }
