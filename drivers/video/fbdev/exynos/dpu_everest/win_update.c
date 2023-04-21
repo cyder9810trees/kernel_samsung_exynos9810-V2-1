@@ -29,6 +29,9 @@ static void win_update_adjust_region(struct decon_device *decon,
 	regs->need_update = false;
 	DPU_FULL_RECT(&regs->up_region, decon->lcd_info);
 
+	/* disable partial update */
+	return;
+
 	if (!decon->win_up.enabled)
 		return;
 
@@ -97,6 +100,9 @@ static void win_update_check_limitation(struct decon_device *decon,
 	struct decon_win_config *config;
 	struct decon_win_rect update;
 	struct decon_rect r;
+	struct v4l2_subdev *sd;
+	struct dpp_ch_restriction ch_res;
+	struct dpp_restriction *res;
 	int i;
 	int sz_align = 1;
 	int adj_src_x = 0, adj_src_y = 0;
@@ -105,6 +111,7 @@ static void win_update_check_limitation(struct decon_device *decon,
 		config = &win_config[i];
 		if (config->state == DECON_WIN_STATE_DISABLED)
 			continue;
+
 
 		r.left = config->dst.x;
 		r.top = config->dst.y;
@@ -134,8 +141,12 @@ static void win_update_check_limitation(struct decon_device *decon,
 				goto change_full;
 		}
 
-		if (((r.right - r.left) < (SRC_WIDTH_MIN * sz_align)) ||
-				((r.bottom - r.top) < (SRC_HEIGHT_MIN * sz_align))) {
+		sd = decon->dpp_sd[0];
+		v4l2_subdev_call(sd, core, ioctl, DPP_GET_RESTRICTION, &ch_res);
+		res = &ch_res.restriction;
+
+		if (((r.right - r.left) < (res->src_f_w.min * sz_align)) ||
+				((r.bottom - r.top) < (res->src_f_h.min * sz_align))) {
 			goto change_full;
 		}
 
@@ -149,7 +160,7 @@ static void win_update_check_limitation(struct decon_device *decon,
 	return;
 
 change_full:
-	DPU_DEBUG_WIN("changed full: win(%d) idma(%d) [%d %d %d %d]\n",
+	DPU_DEBUG_WIN("changed full: win(%d) ch(%d) [%d %d %d %d]\n",
 			i, config->idma_type,
 			config->dst.x, config->dst.y,
 			config->dst.w, config->dst.h);
@@ -215,7 +226,7 @@ static void win_update_reconfig_coordinates(struct decon_device *decon,
 		config->src.w = config->dst.w;
 		config->src.h = config->dst.h;
 
-		DPU_DEBUG_WIN("win(%d), idma(%d)\n", i, config->idma_type);
+		DPU_DEBUG_WIN("win(%d), ch(%d)\n", i, config->idma_type);
 		DPU_DEBUG_WIN("src: origin[%d %d %d %d] -> change[%d %d %d %d]\n",
 				origin_src.x, origin_src.y,
 				origin_src.w, origin_src.h,
@@ -389,6 +400,8 @@ void dpu_set_mres_config(struct decon_device *decon, struct decon_reg_data *regs
 	idx = regs->mres_idx;
 	dsim->lcd_info.dsc_enabled = mres_info->res_info[idx].dsc_en;
 	dsim->lcd_info.dsc_slice_h = mres_info->res_info[idx].dsc_height;
+	dsim->lcd_info.dsc_enc_sw = dsim->lcd_info.dt_dsc_slice.dsc_enc_sw[idx];
+	dsim->lcd_info.dsc_dec_sw = dsim->lcd_info.dt_dsc_slice.dsc_dec_sw[idx];
 
 	/* transfer LCD resolution change commands to panel */
 	dsim->panel_ops->mres(dsim, regs->mres_idx);
@@ -401,8 +414,9 @@ void dpu_set_mres_config(struct decon_device *decon, struct decon_reg_data *regs
 	/* If LCD resolution is changed, initial partial size is also changed */
 	dpu_init_win_update(decon);
 
-	DPU_DEBUG_MRES("changed LCD resolution(%d %d)\n",
-			decon->lcd_info->xres, decon->lcd_info->yres);
+	DPU_DEBUG_MRES("changed LCD resolution(%d %d), dsc enc/dec sw(%d %d)\n",
+			decon->lcd_info->xres, decon->lcd_info->yres,
+			dsim->lcd_info.dsc_enc_sw, dsim->lcd_info.dsc_dec_sw);
 }
 
 #if !defined(CONFIG_EXYNOS_COMMON_PANEL)
@@ -430,7 +444,7 @@ static int win_update_send_partial_command(struct dsim_device *dsim,
 
 	retry = 2;
 	while (dsim_write_data(dsim, MIPI_DSI_DCS_LONG_WRITE,
-				(unsigned long)column, ARRAY_SIZE(column)) != 0) {
+				(unsigned long)column, ARRAY_SIZE(column), true) != 0) {
 		dsim_err("failed to write COLUMN_ADDRESS\n");
 		dsim_reg_function_reset(dsim->id);
 		if (--retry <= 0) {
@@ -441,7 +455,7 @@ static int win_update_send_partial_command(struct dsim_device *dsim,
 
 	retry = 2;
 	while (dsim_write_data(dsim, MIPI_DSI_DCS_LONG_WRITE,
-				(unsigned long)page, ARRAY_SIZE(page)) != 0) {
+				(unsigned long)page, ARRAY_SIZE(page), true) != 0) {
 		dsim_err("failed to write PAGE_ADDRESS\n");
 		dsim_reg_function_reset(dsim->id);
 		if (--retry <= 0) {
@@ -474,7 +488,7 @@ static void win_update_find_included_slice(struct decon_lcd *lcd,
 
 	slice_left = 0;
 	slice_right = 0;
-	slice_width = lcd->xres / lcd->dsc_slice_num;
+	slice_width = lcd->dsc_dec_sw;
 
 	for (i = 0; i < lcd->dsc_slice_num; ++i) {
 		slice_left = slice_width * i;
@@ -533,8 +547,7 @@ void dpu_set_win_update_config(struct decon_device *decon,
 	if (regs == NULL) {
 		regs = kzalloc(sizeof(struct decon_reg_data), GFP_KERNEL);
 		if (!regs) {
-			decon_err("%s:set window update config fail\
-					reg_data allocation fail\n", __func__);
+			decon_err("%s: reg_data allocation fail\n", __func__);
 			return;
 		}
 		DPU_FULL_RECT(&regs->up_region, decon->lcd_info);
@@ -579,7 +592,7 @@ void dpu_init_win_update(struct decon_device *decon)
 	decon->cursor.xpos = lcd->xres / 2;
 	decon->cursor.ypos = lcd->yres / 2;
 
-	if (!IS_ENABLED(CONFIG_FB_WINDOW_UPDATE)) {
+	if (!IS_ENABLED(CONFIG_EXYNOS_WINDOW_UPDATE)) {
 		decon_info("window update feature is disabled\n");
 		return;
 	}

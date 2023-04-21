@@ -4,15 +4,6 @@ config EXYNOS_EVEREST
 	depends on FB
 
 if EXYNOS_EVEREST
-config EXYNOS_DECON_FB
-	bool "Samsung DECON Framebuffer driver"
-	depends on EXYNOS_EVEREST
-	select MEDIA_EXYNOS
-	default y
-	help
-	  Say Y here if you want support for the DECON in Samsung S5P SoCs.
-	  This device produce image data to one of output interfaces.
-
 config EXYNOS_DPP
 	bool "Samsung Exynos Display Post Processor driver"
 	depends on EXYNOS_EVEREST
@@ -28,72 +19,99 @@ config EXYNOS_MIPI_DSIM
 config EXYNOS_DISPLAYPORT
 	bool "Samsung Exynos DISPLAYPORT driver"
 	depends on EXYNOS_EVEREST
-	default y
+	default n
 	help
 	  Enable DISPLAYPORT driver.
 
-config DISPLAYPORT_ENG
-	bool "Samsung Exynos Displayport eng build"
-	depends on EXYNOS_DISPLAYPORT
-	default n
+config EXYNOS_WINDOW_UPDATE
+        bool "Support Window Update Mode"
+        depends on EXYNOS_EVEREST
+        default n
+
+config EXYNOS_BLOCK_MODE
+	bool "Support Blocking Mode"
+        depends on EXYNOS_EVEREST
+        default y
+
+config EXYNOS_HIBERNATION
+	bool "Support Display Hibernation Mode"
+        depends on EXYNOS_EVEREST
+        default n
+
+config EXYNOS_CHANGE_HIBER_CNT
+	bool "Change Hibernation Entry Count at Runtime"
+        depends on EXYNOS_EVEREST && EXYNOS_HIBERNATION
+        default n
+
+config EXYNOS_HIBERNATION_THREAD
+	bool "DECON hiber mode using single thread"
+        depends on EXYNOS_HIBERNATION
+        default n
 
 config LOGGING_BIGDATA_BUG
 	bool "Logging extra information when decon bug"
 	depends on EXYNOS_EVEREST
 	default y
 
-config EXYNOS_ZEBU_EMUL_DISP
-	bool "Zebu Emulator Display driver"
+config EXYNOS_DOZE
+	bool "Support DOZE mode"
+        depends on EXYNOS_EVEREST
+        default n
+
+config EXYNOS_AFBC_DEBUG
+	bool "Support AFBC Decoder Debug"
+        depends on EXYNOS_EVEREST
+        default n
+
+config EXYNOS_MEMMAP_DEBUG
+	bool "Support Memory Map Debug"
+        depends on EXYNOS_EVEREST
+        default n
+
+config EXYNOS_MULTIRESOLUTION
+	bool "Support Multi Resolution LCD"
+	depends on EXYNOS_EVEREST && EXYNOS_WINDOW_UPDATE
+	default n
+
+config EXYNOS_VIRTUAL_DISPLAY
+	bool "Support Virtual Display Mode"
+	depends on EXYNOS_EVEREST
+	default n
+	help
+	  If this menu is enabled, you can boot up board without LCD.
+
+config EXYNOS_LOW_PERSISTENCE
+	bool "Support Low Persistence Mode"
+        depends on EXYNOS_EVEREST
+	default n
+
+config SUPPORT_DOZE
+	bool "Suppot Doze mode to aod service"
 	depends on EXYNOS_EVEREST
 	default n
 
-config FB_WINDOW_UPDATE
-        bool "DECON window update mode"
+config EXYNOS_CURSOR
+	bool "Support Cursor Async Mode"
         depends on EXYNOS_EVEREST
-        default n
-
-config DECON_BLOCKING_MODE
-	bool "DECON blocking mode"
-        depends on EXYNOS_EVEREST
-        default y
-
-config DECON_EVENT_LOG
-	bool "Display sub-system event logger (DECON/DSIM/DPP)"
-        depends on EXYNOS_EVEREST
-        default y
-
-config DECON_HIBER
-	bool "DECON hiber mode"
-        depends on EXYNOS_EVEREST
-        default n
-
-config EXYNOS_HIBERNATION_THREAD
-	bool "DECON hiber mode using single thread"
-        depends on DECON_HIBER
-        default n
-
-config EXYNOS_AFBC
-	bool "Display sub-system AFBC stream"
-        depends on EXYNOS_EVEREST
-        default n
+	default n
 
 config EXYNOS_DSIM_DITHER
 	bool "DSIM SSCG feature"
         depends on EXYNOS_MIPI_DSIM
         default y
 
+config EXYNOS_ADAPTIVE_FREQ
+    bool "Feature for Dsim Adaptive Frequence"
+        depends on EXYNOS_MIPI_DSIM
+        default n
+
 config DECON_BTS_LEGACY
 	bool "Legacy BTS scheme of display"
         depends on EXYNOS_EVEREST
         default n
 
-config DPU_2_0_FENCE
-	bool "fence is signaled at the beginning of a frame"
-        depends on EXYNOS_EVEREST
-        default n
-
 config FB_TEST
-	bool "FB test only"
+	bool "Framebuffer test only"
         depends on EXYNOS_EVEREST
         default n
 
@@ -102,27 +120,42 @@ config DSIM_CMD_TEST
         depends on EXYNOS_EVEREST
         default n
 
-config DPU_2_0_RELEASE_FENCES
-	bool "Release fence FD is created per each enable window"
+config SUPPORT_LEGACY_ION
+	bool "Support legacy ION API"
         depends on EXYNOS_EVEREST
         default n
 
+config SUPPORT_LEGACY_FENCE
+	bool "Support legacy fence API"
+        depends on EXYNOS_EVEREST
+        default n
 
-config SUPPORT_DSU
-	tristate "Support Dynamic Scale Up (Multi-Resolution)"
-	depends on EXYNOS_EVEREST
-	default n
+config SUPPORT_KERNEL_4_9
+	bool "Support kernel version 4.9"
+        depends on EXYNOS_EVEREST
+        default n
 
-config EXYNOS_MULTIRESOLUTION
-	bool "Multi resolution LCD support"
-	depends on EXYNOS_EVEREST && FB_WINDOW_UPDATE
-	default y
+config EXYNOS_FREQ_HOP
+	bool "Support DPHY PLL Frequency Hopping"
+        depends on EXYNOS_EVEREST
+        default n
 
-config EXYNOS_VIRTUAL_DISPLAY
-	bool "Virtual display mode"
-	depends on EXYNOS_EVEREST
+config SUPPORT_RDX_DUMP
+        bool "Support RDX Dump"
+        depends on EXYNOS_EVEREST
+        default n
 
+config EXYNOS_PLL_SLEEP
+	bool "Support DPHY PLL Sleep"
+        depends on EXYNOS_EVEREST
+        default n
+
+config AVOID_TSP_NOISE
+    bool "Tune disp clock to avoid tsp noise"
+        depends on EXYNOS_EVEREST
+        default n
 endif
 
 source "drivers/video/fbdev/exynos/dpu_everest/panels/Kconfig"
 source "drivers/video/fbdev/exynos/dpu_everest/dp_logger/Kconfig"
+source "drivers/video/fbdev/exynos/dpu_everest/mcd_hdr/Kconfig"

@@ -56,7 +56,7 @@ static void secdp_bigdata_save_item_hex(enum DP_BD_ITEM_LIST item, int val);
 static void secdp_bigdata_save_item_char(enum DP_BD_ITEM_LIST item, char val);
 static void secdp_bigdata_save_item_str(enum DP_BD_ITEM_LIST item, char *val);
 
-static ssize_t secdp_bigdata_show(struct class *class,
+static ssize_t dp_error_info_show(struct class *class,
 				struct class_attribute *attr, char *buf)
 {
 	if (dp_status == STATUS_NO_CONNECTION)
@@ -65,7 +65,7 @@ static ssize_t secdp_bigdata_show(struct class *class,
 	return scnprintf(buf, ERR_DATA_BUF_SIZE, "%s", err_data_buf);
 }
 
-static ssize_t secdp_bigdata_store(struct class *dev,
+static ssize_t dp_error_info_store(struct class *dev,
 				struct class_attribute *attr, const char *buf, size_t size)
 {
 	if ((buf[0] | 0x20) == 'c')
@@ -74,8 +74,7 @@ static ssize_t secdp_bigdata_store(struct class *dev,
 	return size;
 }
 
-static CLASS_ATTR(dp_error_info, 0664, secdp_bigdata_show,
-				secdp_bigdata_store);
+static CLASS_ATTR_RW(dp_error_info);
 
 void secdp_bigdata_init(struct class *dp_class)
 {
@@ -210,27 +209,6 @@ static void secdp_bigdata_save_item_str(enum DP_BD_ITEM_LIST item, char *val)
 	} else {
 		strlcpy((char *)item_to_column[item].data, val,
 				item_to_column[item].str_max_len + 1);
-
-		if (item == BD_SINK_NAME) {
-			int i;
-			char t;
-			for (i = 0; i < item_to_column[item].str_max_len; i++) {
-				t = ((char *)item_to_column[item].data)[i];
-				if (t == '\0')
-					break;
-				switch (t) {
-				case '0'...'9':
-				case 'a'...'z':
-				case 'A'...'Z':
-				case '-':
-				case '_':
-					break;
-				default:
-					((char *)item_to_column[item].data)[i] = ' ';
-					break;
-				}
-			}
-		}
 	}
 }
 

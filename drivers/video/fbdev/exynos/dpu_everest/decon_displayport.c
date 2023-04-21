@@ -12,7 +12,9 @@
 #include <linux/clk-provider.h>
 #include <linux/videodev2_exynos_media.h>
 #include <media/v4l2-subdev.h>
+#if defined(CONFIG_CAL_IF)
 #include <soc/samsung/cal-if.h>
+#endif
 #include <dt-bindings/clock/exynos9810.h>
 #include "decon.h"
 #include "displayport.h"
@@ -121,10 +123,15 @@ static int decon_displayport_vsync_thread(void *data)
 
 	while (!kthread_should_stop()) {
 		ktime_t timestamp = decon->vsync.timestamp;
+#if defined(CONFIG_SUPPORT_KERNEL_4_9)
 		int ret = wait_event_interruptible(decon->vsync.wait,
 			!ktime_equal(timestamp, decon->vsync.timestamp) &&
 			decon->vsync.active);
-
+#else
+		int ret = wait_event_interruptible(decon->vsync.wait,
+			(timestamp != decon->vsync.timestamp) &&
+			decon->vsync.active);
+#endif
 		if (!ret)
 			sysfs_notify(&decon->dev->kobj, NULL, "vsync");
 	}
@@ -196,6 +203,10 @@ static int decon_displayport_set_lcd_info(struct decon_device *decon)
 	decon->dt.trig_mode = DECON_HW_TRIG;
 	decon->dt.out_type = DECON_OUT_DP;
 
+	/* set defalut color mode to HAL_COLOR_MODE_NATIVE */
+	decon->lcd_info->color_mode_cnt = 1;
+	decon->lcd_info->color_mode[0] = HAL_COLOR_MODE_NATIVE;
+
 	if (displayport->bpc == BPC_10)
 		decon->lcd_info->bpc = 10; /* 10pbc */
 	else
@@ -227,10 +238,7 @@ int decon_displayport_get_hdr_capa(struct decon_device *decon,
 		struct decon_hdr_capabilities *hdr_capa)
 {
 #if defined(CONFIG_EXYNOS_DISPLAYPORT)
-	struct displayport_device *displayport = get_displayport_drvdata();
-
-	if (displayport->rx_edid_data.hdr_support)
-		hdr_capa->out_types[0] = HDR_HDR10;
+	hdr_capa->out_types[0] = HDR_HDR10;
 #else
 	decon_info("Not compiled displayport driver\n");
 #endif
@@ -240,21 +248,44 @@ int decon_displayport_get_hdr_capa(struct decon_device *decon,
 int decon_displayport_get_hdr_capa_info(struct decon_device *decon,
 		struct decon_hdr_capabilities_info *hdr_capa_info)
 {
+#ifndef CONFIG_EXYNOS_MCD_HDR
+	struct decon_device *decon0 = get_decon_drvdata(0);
+#endif
+
 #if defined(CONFIG_EXYNOS_DISPLAYPORT)
 	struct displayport_device *displayport = get_displayport_drvdata();
 
-	if (displayport->rx_edid_data.hdr_support)
+	displayport_info("hdr capa info: %d\n", displayport->rx_edid_data.hdr_support);
+	if (displayport->rx_edid_data.hdr_support) {
 		hdr_capa_info->out_num = 1;
-	else
-		hdr_capa_info->out_num = 0;
-
-	/* Need CEA-861.3 EDID value calculation on platform part */
-	hdr_capa_info->max_luminance =
-		displayport->rx_edid_data.max_lumi_data;
-	hdr_capa_info->max_average_luminance =
-		displayport->rx_edid_data.max_average_lumi_data;
-	hdr_capa_info->min_luminance =
-		displayport->rx_edid_data.min_lumi_data;
+		/* Need CEA-861.3 EDID value calculation on platform part */
+		hdr_capa_info->max_luminance =
+			displayport->rx_edid_data.max_lumi_data;
+		hdr_capa_info->max_average_luminance =
+			displayport->rx_edid_data.max_average_lumi_data;
+		hdr_capa_info->min_luminance =
+			displayport->rx_edid_data.min_lumi_data;
+	} else { /* For P version platform */
+#ifdef CONFIG_EXYNOS_MCD_HDR	
+		hdr_capa_info->out_num =
+			decon->hdr_info.hdr_num;
+		hdr_capa_info->max_luminance =
+			decon->hdr_info.hdr_max_luma;
+		hdr_capa_info->max_average_luminance =
+			decon->hdr_info.hdr_max_avg_luma;
+		hdr_capa_info->min_luminance =
+			decon->hdr_info.hdr_min_luma;
+#else
+		hdr_capa_info->out_num = 
+			decon0->lcd_info->dt_lcd_hdr.hdr_num;
+		hdr_capa_info->max_luminance = 
+			decon0->lcd_info->dt_lcd_hdr.hdr_max_luma;
+		hdr_capa_info->max_average_luminance = 
+			decon0->lcd_info->dt_lcd_hdr.hdr_max_avg_luma;
+		hdr_capa_info->min_luminance = 
+			decon0->lcd_info->dt_lcd_hdr.hdr_min_luma;
+#endif
+	}
 #else
 	decon_info("Not compiled displayport driver\n");
 #endif
@@ -299,6 +330,13 @@ int decon_displayport_get_config(struct decon_device *decon,
 			DISPLAYPORT_IOC_GET_ENUM_DV_TIMINGS, &displayport_data->etimings);
 
 		decon_dbg("EXYNOS_DISPLAYPORT_STATE_ENUM_PRESET\n");
+		break;
+
+	case EXYNOS_DISPLAYPORT_STATE_HDR_INFO:
+		ret = v4l2_subdev_call(displayport_sd, core, ioctl,
+			DISPLAYPORT_IOC_GET_HDR_INFO, &displayport_data->hdr_support);
+
+		decon_dbg("EXYNOS_DISPLAYPORT_STATE_HDR_INFO\n");
 		break;
 
 	default:

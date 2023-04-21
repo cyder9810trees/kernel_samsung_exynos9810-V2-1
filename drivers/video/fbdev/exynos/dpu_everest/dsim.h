@@ -14,39 +14,56 @@
 
 #include <linux/device.h>
 #include <linux/kernel.h>
+#include <linux/regulator/consumer.h>
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <media/v4l2-subdev.h>
 
 #include "./panels/decon_lcd.h"
+#if defined(CONFIG_SOC_EXYNOS9810)
 #include "./cal_9810/regs-dsim.h"
+#include "./cal_9810/dsim_cal.h"
+#elif defined(CONFIG_SOC_EXYNOS9820)
+#include "./cal_9820/regs-dsim.h"
+#include "./cal_9820/dsim_cal.h"
+#elif defined(CONFIG_SOC_EXYNOS9110)
+#include "./cal_9110/regs-dsim.h"
+#include "./cal_9110/dsim_cal.h"
+#endif
 
 #if defined(CONFIG_EXYNOS_COMMON_PANEL)
 #include "disp_err.h"
-#endif
-#if defined(CONFIG_EXYNOS_DECON_LCD_S6E3HA2K)
+#elif defined(CONFIG_EXYNOS_DECON_LCD_S6E3HA2K)
 #include "./panels/s6e3ha2k_param.h"
+#elif defined(CONFIG_EXYNOS_DECON_LCD_S6E3HF4)
+#include "./panels/s6e3hf4_param.h"
 #elif defined(CONFIG_EXYNOS_DECON_LCD_EMUL_DISP)
 #include "./panels/emul_disp_param.h"
 #elif defined(CONFIG_EXYNOS_DECON_LCD_S6E3HA6)
 #include "./panels/s6e3ha6_param.h"
+#elif defined(CONFIG_EXYNOS_DECON_LCD_S6E3AA2)
+#include "./panels/s6e3aa2_param.h"
+#elif defined(CONFIG_EXYNOS_DECON_LCD_S6E3HA8)
+#include "./panels/s6e3ha8_param.h"
+#elif defined(CONFIG_EXYNOS_DECON_LCD_S6E3HA9)
+#include "./panels/s6e3ha9_param.h"
 #endif
 
 extern int dsim_log_level;
 
-#define DSIM_MODULE_NAME		"exynos-dsim"
-#define DSIM_DDI_ID_LEN			3
+#define DSIM_MODULE_NAME			"exynos-dsim"
+#define MAX_DSIM_CNT				2
+#define DSIM_DDI_ID_LEN				3
 
-#define DSIM_PIXEL_FORMAT_RGB24		0x3E
-#define DSIM_PIXEL_FORMAT_RGB18_PACKED	0x1E
-#define DSIM_PIXEL_FORMAT_RGB18		0x2E
+#define DSIM_PIXEL_FORMAT_RGB24			0x3E
+#define DSIM_PIXEL_FORMAT_RGB18_PACKED		0x1E
+#define DSIM_PIXEL_FORMAT_RGB18			0x2E
 #define DSIM_PIXEL_FORMAT_RGB30_PACKED		0x0D
-#define DSIM_RX_FIFO_MAX_DEPTH		64
-#define MAX_DSIM_CNT			2
-#define MAX_DSIM_DATALANE_CNT		4
+#define DSIM_RX_FIFO_MAX_DEPTH			64
+#define MAX_DSIM_DATALANE_CNT			4
 
-#define MIPI_WR_TIMEOUT			msecs_to_jiffies(50)
-#define MIPI_RD_TIMEOUT			msecs_to_jiffies(100)
+#define MIPI_WR_TIMEOUT				msecs_to_jiffies(50)
+#define MIPI_RD_TIMEOUT				msecs_to_jiffies(100)
 
 #define dsim_err(fmt, ...)							\
 	do {									\
@@ -83,6 +100,8 @@ extern struct dsim_lcd_driver emul_disp_mipi_lcd_driver;
 extern struct dsim_lcd_driver s6e3hf4_mipi_lcd_driver;
 extern struct dsim_lcd_driver s6e3ha6_mipi_lcd_driver;
 extern struct dsim_lcd_driver s6e3ha8_mipi_lcd_driver;
+extern struct dsim_lcd_driver s6e3ha9_mipi_lcd_driver;
+extern struct dsim_lcd_driver s6e3aa2_mipi_lcd_driver;
 #if defined(CONFIG_EXYNOS_COMMON_PANEL)
 extern struct dsim_lcd_driver common_mipi_lcd_driver;
 #endif
@@ -142,11 +161,11 @@ enum {
 /* operation state of dsim driver */
 enum dsim_state {
 	DSIM_STATE_INIT,
-	DSIM_STATE_ON,		/* HS clock was enabled. */
-	DSIM_STATE_DOZE,	/* HS clock was enabled. */
-	DSIM_STATE_ULPS,	/* DSIM was entered ULPS state */
+	DSIM_STATE_ON,			/* HS clock was enabled. */
+	DSIM_STATE_DOZE,		/* HS clock was enabled. */
+	DSIM_STATE_ULPS,		/* DSIM was entered ULPS state */
 	DSIM_STATE_DOZE_SUSPEND,	/* DSIM is suspend state */
-	DSIM_STATE_OFF		/* DSIM is suspend state */
+	DSIM_STATE_OFF			/* DSIM is suspend state */
 };
 
 enum dphy_charic_value {
@@ -167,13 +186,6 @@ struct dsim_pll_param {
 	u32 s;
 	u32 k;
 	u32 pll_freq; /* in/out parameter: Mhz */
-};
-
-struct dsim_clks {
-	u32 hs_clk;
-	u32 esc_clk;
-	u32 byte_clk;
-	u32 word_clk;
 };
 
 struct dphy_timing_value {
@@ -203,7 +215,26 @@ struct dsim_resources {
 	void __iomem *regs;
 	void __iomem *ss_regs;
 	void __iomem *phy_regs;
+	void __iomem *phy_regs_ex;
+	struct regulator *regulator_1p8v;
+	struct regulator *regulator_3p3v;
 };
+
+#ifdef CONFIG_EXYNOS_ADAPTIVE_FREQ
+struct dsim_adap_freq {
+	wait_queue_head_t wait;
+	ktime_t timestamp;
+	bool active;
+	int irq_refcount;
+	struct mutex lock;
+	struct task_struct *thread;
+};
+#endif
+
+#ifdef CONFIG_DYNAMIC_FREQ
+#define DSIM_MODE_POWER_OFF		0
+#define DSIM_MODE_HIBERNATION	1
+#endif
 
 struct dsim_device {
 	int id;
@@ -214,14 +245,19 @@ struct dsim_device {
 	unsigned int data_lane;
 	u32 data_lane_cnt;
 	struct phy *phy;
+	struct phy *phy_ex;
 	spinlock_t slock;
 
 	struct dsim_lcd_driver *panel_ops;
 	struct decon_lcd lcd_info;
+	u32 board_info;
 
 	struct v4l2_subdev sd;
 	struct dsim_clks clks;
 	struct timer_list cmd_timer;
+
+	struct workqueue_struct *wq;
+	struct work_struct wr_timeout_work;
 
 	struct mutex cmd_lock;
 
@@ -229,20 +265,35 @@ struct dsim_device {
 	struct completion rd_comp;
 
 	int total_underrun_cnt;
+	int idle_ip_index;
+
 #if defined(CONFIG_EXYNOS_COMMON_PANEL)
 	struct disp_error_cb_info error_cb_info;
 	struct disp_check_cb_info check_cb_info;
 #endif
+#ifdef CONFIG_EXYNOS_ADAPTIVE_FREQ
+	struct notifier_block ril_notif;
+	struct dsim_adap_freq adap_freq;
+#endif
+
+#ifdef CONFIG_DYNAMIC_FREQ
+	struct df_status_info *df_status;
+	int df_mode;
+#endif
+
 };
 
 struct dsim_lcd_driver {
-	int (*init)(struct dsim_device *dsim);
 	int (*probe)(struct dsim_device *dsim);
 	int (*suspend)(struct dsim_device *dsim);
 	int (*displayon)(struct dsim_device *dsim);
 	int (*resume)(struct dsim_device *dsim);
 	int (*dump)(struct dsim_device *dsim);
-	/* extened functions */
+	int (*mres)(struct dsim_device *dsim, int mres_idx);
+	int (*doze)(struct dsim_device *dsim);
+	int (*doze_suspend)(struct dsim_device *dsim);
+#if defined(CONFIG_EXYNOS_COMMON_PANEL)
+	int (*init)(struct dsim_device *dsim);
 	int (*connected)(struct dsim_device *dsim);
 	int (*is_poweron)(struct dsim_device *dsim);
 	int (*setarea)(struct dsim_device *dsim, u32 l, u32 r, u32 t, u32 b);
@@ -250,17 +301,27 @@ struct dsim_lcd_driver {
 	int (*poweroff)(struct dsim_device *dsim);
 	int (*sleepin)(struct dsim_device *dsim);
 	int (*sleepout)(struct dsim_device *dsim);
-	int (*reset)(struct dsim_device *dsim);
-	int (*doze)(struct dsim_device *dsim);
-	int (*doze_suspend)(struct dsim_device *dsim);
 	int (*notify)(struct dsim_device *dsim, void *data);
 	int (*set_error_cb)(struct dsim_device *dsim);
-	int (*mres)(struct dsim_device *dsim, int mres_idx);
+#endif
+#ifdef CONFIG_EXYNOS_ADAPTIVE_FREQ
+	int (*mipi_freq_change)(struct dsim_device *dsim);
+#endif
+#ifdef CONFIG_DYNAMIC_FREQ
+	int (*set_df_default)(struct dsim_device *dsim);
+	int (*update_lcd_info)(struct dsim_device *dsim);
+#endif
+
 };
 
-int dsim_write_data(struct dsim_device *dsim, u32 id, unsigned long d0, u32 d1);
+int dsim_write_data(struct dsim_device *dsim, u32 id, unsigned long d0, u32 d1, bool must_wait, bool wakeup);
 int dsim_read_data(struct dsim_device *dsim, u32 id, u32 addr, u32 cnt, u8 *buf);
 int dsim_wait_for_cmd_done(struct dsim_device *dsim);
+
+int dsim_reset_panel(struct dsim_device *dsim);
+int dsim_set_panel_power(struct dsim_device *dsim, bool on);
+
+void dsim_to_regs_param(struct dsim_device *dsim, struct dsim_regs *regs);
 
 static inline struct dsim_device *get_dsim_drvdata(u32 id)
 {
@@ -284,7 +345,7 @@ static inline int dsim_wr_data(u32 id, u32 cmd_id, unsigned long d0, u32 d1)
 	int ret;
 	struct dsim_device *dsim = get_dsim_drvdata(id);
 
-	ret = dsim_write_data(dsim, cmd_id, d0, d1);
+	ret = dsim_write_data(dsim, cmd_id, d0, d1, false, true);
 	if (ret)
 		return ret;
 
@@ -345,6 +406,12 @@ static inline u32 dsim_phy_read_mask(u32 id, u32 reg_id, u32 mask)
 	val &= (mask);
 	return val;
 }
+static inline void dsim_phy_extra_write(u32 id, u32 reg_id, u32 val)
+{
+	struct dsim_device *dsim = get_dsim_drvdata(id);
+
+	writel(val, dsim->res.phy_regs_ex + reg_id);
+}
 static inline void dsim_phy_write(u32 id, u32 reg_id, u32 val)
 {
 	struct dsim_device *dsim = get_dsim_drvdata(id);
@@ -362,76 +429,58 @@ static inline void dsim_phy_write_mask(u32 id, u32 reg_id, u32 val, u32 mask)
 	/* printk("offset : 0x%8x, value : 0x%x\n", reg_id, val); */
 }
 
-/* CAL APIs list */
-int dsim_reg_init(u32 id, struct decon_lcd *lcd_info,
-			u32 data_lane_cnt, struct dsim_clks *clks);
-int dsim_reg_set_clocks(u32 id, struct dsim_clks *clks,
-			struct stdphy_pms *dphy_pms, u32 en);
-int dsim_reg_set_lanes(u32 id, u32 lanes, u32 en);
-void dsim_reg_set_int(u32 id, u32 en);
-u32 dsim_reg_rx_fifo_is_empty(u32 id);
-u32 dsim_reg_get_rx_fifo(u32 id);
-int dsim_reg_rx_err_handler(u32 id, u32 rx_fifo);
-void dsim_reg_sw_reset(u32 id);
-void dsim_reg_dphy_reset(u32 id);
-void dsim_reg_dphy_resetn(u32 id, u32 en);
-int dsim_reg_exit_ulps_and_start(u32 id, u32 ddi_type, u32 lanes);
-int dsim_reg_stop_and_enter_ulps(u32 id, u32 ddi_type, u32 lanes);
-void dsim_reg_start(u32 id);
-void dsim_reg_stop(u32 id, u32 lanes);
-void dsim_reg_set_mres(u32 id, struct decon_lcd *lcd_info);
-void dsim_reg_wr_tx_payload(u32 id, u32 payload);
-u32 dsim_reg_header_fifo_is_empty(u32 id);
-void dsim_reg_clear_int(u32 id, u32 int_src);
-void dsim_reg_set_fifo_ctrl(u32 id, u32 cfg);
-void dsim_reg_enable_shadow_read(u32 id, u32 en);
-u32 dsim_reg_is_writable_fifo_state(u32 id);
-void dsim_reg_wr_tx_header(u32 id, u32 data_id, unsigned long data0, u32 data1, u32 bta_type);
-void dsim_set_bist(u32 id, u32 en);
-void dsim_reg_set_partial_update(u32 id, struct decon_lcd *lcd_info);
-void dsim_reg_set_bta_type(u32 id, u32 bta_type);
-void dsim_reg_set_num_of_transfer(u32 id, u32 num_of_transfer);
-
-void dsim_reg_function_reset(u32 id);
-void dsim_reg_set_esc_clk_on_lane(u32 id, u32 en, u32 lane);
-void dsim_reg_enable_word_clock(u32 id, u32 en);
-void dsim_reg_set_esc_clk_prescaler(u32 id, u32 en, u32 p);
-u32 dsim_reg_is_pll_stable(u32 id);
-
-void dsim_reg_set_link_clock(u32 id, u32 en);
-void dsim_reg_set_video_mode(u32 id, u32 mode);
-void dsim_reg_enable_shadow(u32 id, u32 en);
 #if defined(CONFIG_EXYNOS_COMMON_PANEL)
 int dsim_function_reset(struct dsim_device *dsim);
 void parse_lcd_info(struct device_node *, struct decon_lcd *);
 #endif
+/* DPHY loop back for test */
+#ifdef DPHY_LOOP
+void dsim_reg_set_dphy_loop_back_test(u32 id);
+#endif
 
 static inline bool IS_DSIM_ON_STATE(struct dsim_device *dsim)
 {
+#ifdef CONFIG_EXYNOS_DOZE
 	return (dsim->state == DSIM_STATE_ON ||
 			dsim->state == DSIM_STATE_DOZE);
+#else
+	return (dsim->state == DSIM_STATE_ON);
+#endif
 }
 
 static inline bool IS_DSIM_OFF_STATE(struct dsim_device *dsim)
 {
 	return (dsim->state == DSIM_STATE_ULPS ||
+#ifdef CONFIG_EXYNOS_DOZE
 			dsim->state == DSIM_STATE_DOZE_SUSPEND ||
+#endif
 			dsim->state == DSIM_STATE_OFF);
 }
+
+#ifdef CONFIG_EXYNOS_ADAPTIVE_FREQ
+int dsim_update_adaptive_freq(struct dsim_device *dsim, bool force);
+#endif
 
 #define DSIM_IOC_ENTER_ULPS		_IOW('D', 0, u32)
 #define DSIM_IOC_GET_LCD_INFO		_IOW('D', 5, struct decon_lcd *)
 #define DSIM_IOC_DUMP			_IOW('D', 8, u32)
 #define DSIM_IOC_GET_WCLK		_IOW('D', 9, u32)
-
 #define DSIM_IOC_SET_CONFIG		_IOW('D', 10, u32)
+#define DSIM_IOC_DOZE			_IOW('D', 20, u32)
+#define DSIM_IOC_DOZE_SUSPEND		_IOW('D', 21, u32)
+#define DSIM_IOC_SET_FREQ_HOP		_IOW('D', 30, u32)
 
-#define DSIM_IOC_DOZE           _IOW('D', 20, u32)
-#define DSIM_IOC_DOZE_SUSPEND   _IOW('D', 21, u32)
+#ifdef CONFIG_DYNAMIC_FREQ
+#define DSIM_IOC_SET_PRE_FREQ_HOP		_IOW('D', 40, u32)
+#define DSIM_IOC_SET_POST_FREQ_HOP		_IOW('D', 41, u32)
+#endif
+
+#ifdef CONFIG_EXYNOS_ADAPTIVE_FREQ
+#define DSIM_IOC_FREQ_CHANGE	_IOW('D', 40, u32)
+#endif
 
 #if defined(CONFIG_EXYNOS_COMMON_PANEL)
 #define DSIM_IOC_NOTIFY			_IOW('D', 50, u32)
 #define DSIM_IOC_SET_ERROR_CB	_IOW('D', 51, struct disp_error_cb_info *)
 #endif
-
 #endif /* __SAMSUNG_DSIM_H__ */
