@@ -26,7 +26,7 @@
 #include <soc/samsung/bts.h>
 
 #include "decon.h"
-#include "./cal_9810/regs-dpp.h"
+#include "regs-dpp.h"
 
 extern int dpp_log_level;
 
@@ -411,6 +411,5 @@ irqreturn_t dma_irq_handler(int irq, void *priv);
 #define DPP_WB_WAIT_FOR_FRAMEDONE	_IOR('P', 3, u32)
 #define DPP_WAIT_IDLE			_IOR('P', 4, unsigned long)
 #define DPP_SET_RECOVERY_NUM		_IOR('P', 5, unsigned long)
-#define DPP_GET_RECOVERY_CNT		_IOR('P', 6, unsigned long)
 
 #endif /* __SAMSUNG_DPP_H__ */

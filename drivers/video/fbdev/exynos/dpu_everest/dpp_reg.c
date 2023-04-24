@@ -1,4 +1,4 @@
-/* linux/drivers/video/exynos/fbdev/dpu_everest/dpp_regs.c
+/* linux/drivers/video/exynos/fbdev/dpu_9810/dpp_regs.c
  *
  * Copyright (c) 2017 Samsung Electronics Co., Ltd.
  *		http://www.samsung.com
@@ -16,9 +16,9 @@
 #include <linux/ktime.h>
 #include <video/exynos_hdr_tunables.h>
 
-#include "../dpp.h"
-#include "../dpp_coef.h"
-#include "../hdr_lut.h"
+#include "dpp.h"
+#include "dpp_coef.h"
+#include "hdr_lut.h"
 
 #define DPP_SC_RATIO_MAX	((1 << 20) * 8 / 8)
 #define DPP_SC_RATIO_7_8	((1 << 20) * 8 / 7)
@@ -397,47 +397,9 @@ static void dpp_reg_set_csc_params(u32 id, u32 csc_eq)
 	u32 mode = (csc_eq <= CSC_DCI_P3) ? CSC_COEF_HARDWIRED : CSC_COEF_CUSTOMIZED;
 	u32 val, mask;
 
-	Val = (DPP_CSC_TYPE(type) | DPP_CSC_RANGE(range) | DPP_CSC_MODE(mode));
+	val = (DPP_CSC_TYPE(type) | DPP_CSC_RANGE(range) | DPP_CSC_MODE(mode));
 	mask = (DPP_CSC_TYPE_MASK | DPP_CSC_RANGE_MASK | DPP_CSC_MODE_MASK);
 	dpp_write_mask(id, DPP_IN_CON, val, mask);
-
-	if (!test_bit(DPP_ATTR_CSC, &attr))
-		return;
-
-	csc_std = (type >> CSC_STANDARD_SHIFT) & 0x3F;
-	csc_rng = (type >> CSC_RANGE_SHIFT) & 0x7;
-
-	if (csc_std == CSC_STANDARD_UNSPECIFIED) {
-		dpp_dbg("unspecified CSC type! -> BT_601\n");
-		csc_std = CSC_BT_601;
-	}
-
-	if (csc_rng == CSC_RANGE_UNSPECIFIED) {
-		dpp_dbg("unspecified CSC range! -> LIMIT\n");
-		csc_rng = CSC_RANGE_LIMITED;
-	}
-
-	if (csc_std <= CSC_DCI_P3)
-		coef_mode = CSC_COEF_HARDWIRED;
-	else
-		coef_mode = CSC_COEF_CUSTOMIZED;
-
-	if (test_bit(DPP_ATTR_ODMA, &attr)) {
-		/* only support {601, 709, N, W} */
-		csc_type = (csc_std << 1) | (csc_rng << 0);
-		if (csc_type > 3) {
-			dpp_info("[WB] Unsupported CSC(%d) !\n", csc_type);
-			dpp_info("[WB] -> forcing BT_601_LIMITTED\n");
-			csc_type = ((CSC_BT_601 << 1) | CSC_RANGE_LIMITED);
-		}
-		wb_reg_set_rgb_type(id, csc_type);
-		return;
-	}
-
-	dpp_reg_set_csc_type(id, csc_std, csc_rng, coef_mode);
-
-	if (coef_mode != CSC_COEF_HARDWIRED)
-		dpp_reg_set_csc_coef(id, csc_std, csc_rng);
 
 	if (mode == CSC_COEF_CUSTOMIZED)
 		dpp_reg_set_csc_coef(id, type, range);

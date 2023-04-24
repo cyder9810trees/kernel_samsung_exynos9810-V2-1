@@ -32,9 +32,6 @@ static void win_update_adjust_region(struct decon_device *decon,
 	if (!decon->win_up.enabled)
 		return;
 
-	if (IS_DECON_DOZE_STATE(decon))
-		return;
-
 	if (update_config->state != DECON_WIN_STATE_UPDATE)
 		return;
 
@@ -405,7 +402,6 @@ void dpu_set_mres_config(struct decon_device *decon, struct decon_reg_data *regs
 			decon->lcd_info->xres, decon->lcd_info->yres);
 }
 
-#if !defined(CONFIG_EXYNOS_COMMON_PANEL)
 static int win_update_send_partial_command(struct dsim_device *dsim,
 		struct decon_rect *rect)
 {
@@ -452,19 +448,6 @@ static int win_update_send_partial_command(struct dsim_device *dsim,
 
 	return 0;
 }
-#else
-static int win_update_send_partial_command(struct dsim_device *dsim,
-		struct decon_rect *rect)
-{
-	DPU_DEBUG_WIN("SET: [%d %d %d %d]\n", rect->left, rect->top,
-			rect->right - rect->left + 1, rect->bottom - rect->top + 1);
-
-	call_panel_ops(dsim, setarea, dsim,
-			rect->left, rect->right, rect->top, rect->bottom);
-
-	return 0;
-}
-#endif
 
 static void win_update_find_included_slice(struct decon_lcd *lcd,
 		struct decon_rect *rect, bool in_slice[])

@@ -26,9 +26,6 @@
 #include "displayport.h"
 #include "./panels/lcd_ctrl.h"
 #include <video/mipi_display.h>
-#ifdef CONFIG_EXYNOS_COMMON_PANEL
-#include "../panel/panel_drv.h"
-#endif
 
 static int __dpu_match_dev(struct device *dev, void *data)
 {
@@ -36,9 +33,6 @@ static int __dpu_match_dev(struct device *dev, void *data)
 	struct dsim_device *dsim;
 	struct displayport_device *displayport;
 	struct decon_device *decon = (struct decon_device *)data;
-#ifdef CONFIG_EXYNOS_COMMON_PANEL
-	struct panel_device *panel;
-#endif
 
 	decon_dbg("%s: drvname(%s)\n", __func__, dev->driver->name);
 
@@ -55,12 +49,6 @@ static int __dpu_match_dev(struct device *dev, void *data)
 		displayport = (struct displayport_device *)dev_get_drvdata(dev);
 		decon->displayport_sd = &displayport->sd;
 		decon_dbg("displayport sd name(%s)\n", displayport->sd.name);
-#ifdef CONFIG_EXYNOS_COMMON_PANEL
-	} else if (!strcmp(PANEL_DRV_NAME, dev->driver->name)) {
-		panel = (struct panel_device *)dev_get_drvdata(dev);
-		decon->panel_sd = &panel->sd;
-		decon_info("panel sd name(%s)\n", panel->sd.name);
-#endif
 	} else {
 		decon_err("failed to get driver name\n");
 	}
@@ -455,7 +443,7 @@ int decon_get_valid_fd(void)
 		 * fd is tried to get value again except current fd vlaue.
 		 */
 		while (fd < VALID_FD_VAL) {
-			decon_dbg("%s, unvalid fd[%d] is assigned to DECON\n",
+			decon_warn("%s, unvalid fd[%d] is assigned to DECON\n",
 					__func__, fd);
 			unused_fd[fd_idx++] = fd;
 			fd = get_unused_fd_flags(O_CLOEXEC);
@@ -467,7 +455,7 @@ int decon_get_valid_fd(void)
 		}
 
 		while (fd_idx-- > 0) {
-			decon_dbg("%s, unvalid fd[%d] is released by DECON\n",
+			decon_warn("%s, unvalid fd[%d] is released by DECON\n",
 					__func__, unused_fd[fd_idx]);
 			put_unused_fd(unused_fd[fd_idx]);
 		}
@@ -824,6 +812,7 @@ static int dpu_dump_buffer_data(struct dpp_device *dpp)
 	struct dpu_afbc_info *afbc_info;
 
 	if (dpp->state == DPP_STATE_ON) {
+
 		for (i = 0; i < MAX_DECON_CNT; i++) {
 			decon = get_decon_drvdata(i);
 			if (decon == NULL)
@@ -882,7 +871,7 @@ int dpu_sysmmu_fault_handler(struct iommu_domain *domain,
 		}
 	}
 
-	decon_dump(decon, IGN_DSI_DUMP);
+	decon_dump(decon);
 
 	return 0;
 }

@@ -9,7 +9,7 @@
  * published by the Free Software Foundation.
  */
 
-#include "../dsim.h"
+#include "dsim.h"
 
 /* These definitions are need to guide from AP team */
 #define DSIM_STOP_STATE_CNT		0xA
@@ -1685,7 +1685,7 @@ void dsim_reg_set_config(u32 id, struct decon_lcd *lcd_info, u32 data_lane_cnt,
 
 	if (lcd_info->mode == DECON_MIPI_COMMAND_MODE) {
 		/* DSU_MODE_1 is used in stead of 1 in MCD */
-		idx = lcd_info->mres_mode - DSU_MODE_1;
+		idx = lcd_info->mres_mode;
 		dsim_reg_set_cm_underrun_lp_ref(id,
 				lcd_info->cmd_underrun_lp_ref[idx]);
 	}
@@ -2260,4 +2260,3 @@ void dsim_reg_set_mres(u32 id, struct decon_lcd *lcd_info)
 		dsim_reg_print_size_of_slice(id);
 	}
 }
-

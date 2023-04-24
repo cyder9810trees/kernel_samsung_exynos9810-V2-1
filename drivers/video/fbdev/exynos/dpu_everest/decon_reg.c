@@ -1,5 +1,5 @@
 /*
- * linux/drivers/video/fbdev/exynos/dpu_everest/decon_reg.c
+ * linux/drivers/video/fbdev/exynos/dpu_9810/decon_reg.c
  *
  * Copyright 2013-2017 Samsung Electronics
  *	  SeungBeom Park <sb1.park@samsung.com>
@@ -9,7 +9,7 @@
  * published by the Free Software Foundation.
  */
 
-#include "../decon.h"
+#include "decon.h"
 /* current setting for 3HF4 & 3HA6 does not support VESA_SCR_V4 */
 /* #define VESA_SCR_V4 */
 /******************* CAL raw functions implementation *************************/
@@ -31,21 +31,6 @@ u32 decon_reg_get_cam_status(void __iomem *cam_status)
 	else
 		return 0xF;
 }
-
-#ifdef CONFIG_SUPPORT_HMD
-bool is_hmd_running(struct decon_device *decon)
-{
-#ifdef CONFIG_EXYNOS_COMMON_PANEL
-	if ((decon->panel_state != NULL) &&
-		(decon->panel_state->hmd_on))
-		return false;
-	else
-		return true;
-#else
-	return true;
-#endif
-}
-#endif
 
 int decon_reg_reset(u32 id)
 {
@@ -1850,9 +1835,6 @@ int decon_reg_start(u32 id, struct decon_mode_info *psr)
 {
 	int ret = 0;
 
-	if (psr->out_type == DECON_OUT_DP)
-		displayport_reg_lh_p_ch_power(1);
-
 	decon_reg_direct_on_off(id, 1);
 	decon_reg_update_req_global(id);
 
@@ -1957,10 +1939,8 @@ int decon_reg_stop_inst(u32 id, u32 dsi_idx, struct decon_mode_info *psr)
 
 	decon_reg_update_req_global(id);
 
-#if defined(CONFIG_EXYNOS_DISPLAYPORT)
 	if (psr->out_type == DECON_OUT_DP)
 		displayport_reg_lh_p_ch_power(0);
-#endif
 
 	/* timeout : 1 / fps + 20% margin */
 	timeout_value = 1000 / decon->lcd_info->fps * 12 / 10 + 5;
@@ -1981,7 +1961,6 @@ int decon_reg_stop(u32 id, u32 dsi_idx, struct decon_mode_info *psr, bool rst)
 	int ret = 0;
 
 	if (psr->out_type == DECON_OUT_DP) {
-		displayport_reg_set_interrupt_mask(VIDEO_FIFO_UNDER_FLOW_MASK, 0);
 		ret = decon_reg_stop_inst(id, dsi_idx, psr);
 		if (ret < 0)
 			decon_err("%s, failed to DP instant_stop\n", __func__);
@@ -2317,7 +2296,7 @@ u32 decon_reg_get_height(u32 id, int dsi_mode)
 	return 0;
 }
 
-const double decon_clocks_table[][CLK_ID_MAX] = {
+const unsigned long decon_clocks_table[][CLK_ID_MAX] = {
 	/* VCLK, ECLK, ACLK, PCLK, DISP_PLL, resolution, MIC_ratio, DSC count */
 	{  71,   168, 400, 66,   71, 1080 * 1920,    MIC_COMP_BYPASS,  0},
 	{  63,   168, 400, 66,   63, 1440 * 2560, MIC_COMP_RATIO_1_2,  0},

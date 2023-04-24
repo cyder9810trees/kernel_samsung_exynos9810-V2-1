@@ -95,8 +95,6 @@ static inline void dpu_event_log_dsim
 	case DPU_EVT_DSIM_RESUME:
 	case DPU_EVT_ENTER_ULPS:
 	case DPU_EVT_EXIT_ULPS:
-	case DPU_EVT_DSIM_PHY_ON:
-	case DPU_EVT_DSIM_PHY_OFF:
 		log->data.pm.pm_status = pm_runtime_active(dsim->dev);
 		log->data.pm.elapsed = ktime_sub(ktime_get(), log->time);
 		break;
@@ -237,8 +235,6 @@ void DPU_EVENT_LOG(dpu_event_t type, struct v4l2_subdev *sd, ktime_t time)
 	case DPU_EVT_ENTER_ULPS:
 	case DPU_EVT_EXIT_ULPS:
 	case DPU_EVT_DSIM_SHUTDOWN:
-	case DPU_EVT_DSIM_PHY_ON:
-	case DPU_EVT_DSIM_PHY_OFF:
 		dpu_event_log_dsim(type, sd, time);
 		break;
 	case DPU_EVT_DPP_FRAMEDONE:
@@ -460,11 +456,12 @@ void DPU_EVENT_SHOW(struct seq_file *s, struct decon_device *decon)
 	int latest = idx;
 	struct timeval tv;
 	ktime_t prev_ktime;
-	struct dsim_device *dsim = NULL;
+	struct dsim_device *dsim;
 
 	if (IS_ERR_OR_NULL(decon->d.event_log))
 		return;
 
+	dsim = get_dsim_drvdata(decon->id);
 
 	/* TITLE */
 	seq_printf(s, "-------------------DECON%d EVENT LOGGER ----------------------\n",
@@ -474,14 +471,8 @@ void DPU_EVENT_SHOW(struct seq_file *s, struct decon_device *decon)
 	seq_printf(s, "BlockMode(%s) ",
 			IS_ENABLED(CONFIG_DECON_BLOCKING_MODE) ? "on" : "off");
 	seq_printf(s, "Window_Update(%s)\n",
-			IS_ENABLED(CONFIG_FB_WINDOW_UPDATE) ? "on" : "off");
-
-	if (decon->id < MAX_DSIM_CNT && decon->dt.out_type == DECON_OUT_DSI) {
-		dsim = get_dsim_drvdata(decon->id);
-		if (dsim != NULL)
-			seq_printf(s, "-- Total underrun count(%d)\n", dsim->total_underrun_cnt);
-	}
-
+			decon->win_up.enabled ? "on" : "off");
+	seq_printf(s, "-- Total underrun count(%d)\n", dsim->total_underrun_cnt);
 	seq_printf(s, "-- Hibernation enter/exit count(%d %d)\n",
 			decon->hiber.enter_cnt, decon->hiber.exit_cnt);
 	seq_puts(s, "-------------------------------------------------------------\n");
@@ -573,12 +564,6 @@ void DPU_EVENT_SHOW(struct seq_file *s, struct decon_device *decon)
 			break;
 		case DPU_EVT_DSIM_SHUTDOWN:
 			seq_printf(s, "%20s  %20s", "DSIM_SHUTDOWN", "-\n");
-			break;
-		case DPU_EVT_DSIM_PHY_ON:
-			seq_printf(s, "%20s  %20s", "DSIM_PHY_ON", "-\n");
-			break;
-		case DPU_EVT_DSIM_PHY_OFF:
-			seq_printf(s, "%20s  %20s", "DSIM_PHY_OFF", "-\n");
 			break;
 		case DPU_EVT_DECON_FRAMESTART:
 			seq_printf(s, "%20s  %20s", "DECON_FRAMESTART", "-\n");
@@ -692,7 +677,7 @@ static int decon_debug_dump_show(struct seq_file *s, void *unused)
 		decon_info("%s: decon is not ON(%d)\n", __func__, decon->state);
 		return 0;
 	}
-	decon_dump(decon, REQ_DSI_DUMP);
+	decon_dump(decon);
 	return 0;
 }
 
@@ -789,49 +774,6 @@ out:
 static const struct file_operations decon_win_fops = {
 	.open = decon_debug_win_open,
 	.write = decon_debug_win_write,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = seq_release,
-};
-
-static int decon_debug_mres_show(struct seq_file *s, void *unused)
-{
-	seq_printf(s, "%u\n", dpu_mres_log_level);
-
-	return 0;
-}
-
-static int decon_debug_mres_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, decon_debug_mres_show, inode->i_private);
-}
-
-static ssize_t decon_debug_mres_write(struct file *file, const char __user *buf,
-		size_t count, loff_t *f_ops)
-{
-	char *buf_data;
-	int ret;
-
-	buf_data = kmalloc(count, GFP_KERNEL);
-	if (buf_data == NULL)
-		return count;
-
-	ret = copy_from_user(buf_data, buf, count);
-	if (ret < 0)
-		goto out;
-
-	ret = sscanf(buf_data, "%u", &dpu_mres_log_level);
-	if (ret < 0)
-		goto out;
-
-out:
-	kfree(buf_data);
-	return count;
-}
-
-static const struct file_operations decon_mres_fops = {
-	.open = decon_debug_mres_open,
-	.write = decon_debug_mres_write,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = seq_release,
@@ -1065,6 +1007,55 @@ static const struct file_operations decon_rec_fops = {
 	.release = seq_release,
 };
 
+static int decon_debug_low_persistence_show(struct seq_file *s, void *unused)
+{
+	struct decon_device *decon = get_decon_drvdata(0);
+	seq_printf(s, "%u\n", decon->low_persistence);
+
+	return 0;
+}
+
+static int decon_debug_low_persistence_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, decon_debug_low_persistence_show, inode->i_private);
+}
+
+static ssize_t decon_debug_low_persistence_write(struct file *file, const char __user *buf,
+		size_t count, loff_t *f_ops)
+{
+	struct decon_device *decon;
+	char *buf_data;
+	int ret;
+	unsigned int low_persistence;
+
+	buf_data = kmalloc(count, GFP_KERNEL);
+	if (buf_data == NULL)
+		return count;
+
+	ret = copy_from_user(buf_data, buf, count);
+	if (ret < 0)
+		goto out;
+
+	ret = sscanf(buf_data, "%u", &low_persistence);
+	if (ret < 0)
+		goto out;
+
+	decon = get_decon_drvdata(0);
+	decon->low_persistence = low_persistence;
+
+out:
+	kfree(buf_data);
+	return count;
+}
+
+static const struct file_operations decon_low_persistence_fops = {
+	.open = decon_debug_low_persistence_open,
+	.write = decon_debug_low_persistence_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+
 int decon_create_debugfs(struct decon_device *decon)
 {
 	char name[MAX_NAME_SIZE];
@@ -1075,7 +1066,7 @@ int decon_create_debugfs(struct decon_device *decon)
 	decon->d.event_log = NULL;
 	event_cnt = DPU_EVENT_LOG_MAX;
 
-	for (i = 0; i < 3; ++i) {
+	for (i = 0; i < DPU_EVENT_LOG_RETRY; ++i) {
 		event_cnt = event_cnt >> i;
 		decon->d.event_log = kzalloc(sizeof(struct dpu_log) * event_cnt,
 				GFP_KERNEL);
@@ -1137,13 +1128,6 @@ int decon_create_debugfs(struct decon_device *decon)
 			ret = -ENOENT;
 			goto err_debugfs;
 		}
-		decon->d.debug_mres = debugfs_create_file("mres_log", 0444,
-				decon->d.debug_root, NULL, &decon_mres_fops);
-		if (!decon->d.debug_mres) {
-			decon_err("failed to create mres log level file\n");
-			ret = -ENOENT;
-			goto err_debugfs;
-		}
 		decon->d.debug_systrace = debugfs_create_file("decon_systrace", 0444,
 				decon->d.debug_root, NULL, &decon_systrace_fops);
 		if (!decon->d.debug_systrace) {
@@ -1171,6 +1155,13 @@ int decon_create_debugfs(struct decon_device *decon)
 				0444, decon->d.debug_root, NULL, &decon_cmd_lp_ref_fops);
 		if (!decon->d.debug_cmd_lp_ref) {
 			decon_err("failed to create cmd_lp_ref file\n");
+			ret = -ENOENT;
+			goto err_debugfs;
+		}
+		decon->d.debug_low_persistence = debugfs_create_file("low_persistence",
+				0444, decon->d.debug_root, NULL, &decon_low_persistence_fops);
+		if (!decon->d.debug_low_persistence) {
+			decon_err("failed to create low persistence file\n");
 			ret = -ENOENT;
 			goto err_debugfs;
 		}

@@ -32,16 +32,6 @@ config EXYNOS_DISPLAYPORT
 	help
 	  Enable DISPLAYPORT driver.
 
-config DISPLAYPORT_ENG
-	bool "Samsung Exynos Displayport eng build"
-	depends on EXYNOS_DISPLAYPORT
-	default n
-
-config LOGGING_BIGDATA_BUG
-	bool "Logging extra information when decon bug"
-	depends on EXYNOS_EVEREST
-	default y
-
 config EXYNOS_ZEBU_EMUL_DISP
 	bool "Zebu Emulator Display driver"
 	depends on EXYNOS_EVEREST
@@ -59,7 +49,7 @@ config DECON_BLOCKING_MODE
 
 config DECON_EVENT_LOG
 	bool "Display sub-system event logger (DECON/DSIM/DPP)"
-        depends on EXYNOS_EVEREST
+        depends on DEBUG_INFO && EXYNOS_EVEREST
         default y
 
 config DECON_HIBER
@@ -67,9 +57,9 @@ config DECON_HIBER
         depends on EXYNOS_EVEREST
         default n
 
-config EXYNOS_HIBERNATION_THREAD
-	bool "DECON hiber mode using single thread"
-        depends on DECON_HIBER
+config SUPPORT_DOZE
+	bool "Support DOZE mode for AOD service"
+        depends on EXYNOS_EVEREST
         default n
 
 config EXYNOS_AFBC
@@ -107,12 +97,6 @@ config DPU_2_0_RELEASE_FENCES
         depends on EXYNOS_EVEREST
         default n
 
-
-config SUPPORT_DSU
-	tristate "Support Dynamic Scale Up (Multi-Resolution)"
-	depends on EXYNOS_EVEREST
-	default n
-
 config EXYNOS_MULTIRESOLUTION
 	bool "Multi resolution LCD support"
 	depends on EXYNOS_EVEREST && FB_WINDOW_UPDATE
@@ -122,7 +106,10 @@ config EXYNOS_VIRTUAL_DISPLAY
 	bool "Virtual display mode"
 	depends on EXYNOS_EVEREST
 
+config EXYNOS_LOW_PERSISTENCE
+	bool "Support low persistence mode"
+        depends on EXYNOS_EVEREST
+
 endif
 
 source "drivers/video/fbdev/exynos/dpu_everest/panels/Kconfig"
-source "drivers/video/fbdev/exynos/dpu_everest/dp_logger/Kconfig"

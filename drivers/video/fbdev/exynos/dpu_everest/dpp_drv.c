@@ -140,8 +140,6 @@ static void dpp_get_params(struct dpp_device *dpp, struct dpp_params_info *p)
 	p->addr[3] = 0;
 	p->eq_mode = config->dpp_parm.eq_mode;
 	p->hdr = config->dpp_parm.hdr_std;
-	p->max_luminance = config->dpp_parm.max_luminance;
-	p->min_luminance = config->dpp_parm.min_luminance;
 	p->is_4p = false;
 	p->y_2b_strd = 0;
 	p->c_2b_strd = 0;
@@ -594,11 +592,6 @@ static long dpp_subdev_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg
 		ret = dpp_wb_wait_for_framedone(dpp);
 		break;
 
-	case DPP_GET_RECOVERY_CNT:
-		if (arg)
-			*((int *)arg) = dpp->d.recovery_cnt;
-		break;
-
 	default:
 		break;
 	}
@@ -679,8 +672,8 @@ static int dpp_init_resources(struct dpp_device *dpp, struct platform_device *pd
 	dpp_info("dma irq no = %lld\n", res->start);
 
 	dpp->res.dma_irq = res->start;
-	ret = devm_request_irq(dpp->dev, res->start, dma_irq_handler,
-			IRQF_PERF_CRITICAL, pdev->name, dpp);
+	ret = devm_request_irq(dpp->dev, res->start, dma_irq_handler, 0,
+			pdev->name, dpp);
 	if (ret) {
 		dpp_err("failed to install DPU DMA irq\n");
 		return -EINVAL;
@@ -710,8 +703,8 @@ static int dpp_init_resources(struct dpp_device *dpp, struct platform_device *pd
 		dpp_info("dpp irq no = %lld\n", res->start);
 
 		dpp->res.irq = res->start;
-		ret = devm_request_irq(dpp->dev, res->start, dpp_irq_handler,
-				IRQF_PERF_CRITICAL, pdev->name, dpp);
+		ret = devm_request_irq(dpp->dev, res->start, dpp_irq_handler, 0,
+				pdev->name, dpp);
 		if (ret) {
 			dpp_err("failed to install DPP irq\n");
 			return -EINVAL;

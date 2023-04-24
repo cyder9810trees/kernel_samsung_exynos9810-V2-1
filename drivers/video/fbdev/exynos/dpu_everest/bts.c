@@ -100,9 +100,6 @@ static void dpu_bts_find_max_disp_freq(struct decon_device *decon,
 	u64 resol_clock;
 	u64 op_fps = LCD_REFRESH_RATE;
 	struct decon_win_config *config = regs->dpp_config;
-	struct bts_dpp_info dpp_info;
-
-	dpp_info = decon->bts.bts_info.dpp[IDMA_VGF1];
 
 	memset(disp_ch_bw, 0, sizeof(disp_ch_bw));
 
@@ -151,11 +148,6 @@ static void dpu_bts_find_max_disp_freq(struct decon_device *decon,
 
 	if (decon->bts.max_disp_freq < disp_op_freq)
 		decon->bts.max_disp_freq = disp_op_freq;
-
-	if (dpp_info.used && dpp_info.rotation)
-		if (((dpp_info.src_w * dpp_info.src_h) > FHD) &&
-				(decon->bts.max_disp_freq < 400 * KHZ))
-			decon->bts.max_disp_freq = 400 * KHZ;
 
 	DPU_DEBUG_BTS("\tMAX DISP CH FREQ = %d\n", decon->bts.max_disp_freq);
 }
@@ -299,11 +291,9 @@ void dpu_bts_update_bw(struct decon_device *decon, struct decon_reg_data *regs,
 		u32 is_after)
 {
 	struct bts_bw bw = { 0, };
-#if defined(CONFIG_EXYNOS_DISPLAYPORT)
 	struct displayport_device *displayport = get_displayport_drvdata();
 	videoformat cur = displayport->cur_video;
 	__u64 pixelclock = supported_videos[cur].dv_timings.bt.pixelclock;
-#endif
 
 	DPU_DEBUG_BTS("%s +\n", __func__);
 
@@ -322,11 +312,9 @@ void dpu_bts_update_bw(struct decon_device *decon, struct decon_reg_data *regs,
 		if (decon->bts.total_bw <= decon->bts.prev_total_bw)
 			bts_update_bw(decon->bts.type, bw);
 
-#if defined(CONFIG_EXYNOS_DISPLAYPORT)
 		if ((displayport->state == DISPLAYPORT_STATE_ON)
-			&& (pixelclock >= UHD_60HZ_PIXEL_CLOCK)) /* 4K DP case */
+			&& (pixelclock >= 533000000)) /* 4K DP case */
 			return;
-#endif
 
 		if (decon->bts.max_disp_freq <= decon->bts.prev_max_disp_freq)
 			pm_qos_update_request(&decon->bts.disp_qos,
@@ -338,11 +326,9 @@ void dpu_bts_update_bw(struct decon_device *decon, struct decon_reg_data *regs,
 		if (decon->bts.total_bw > decon->bts.prev_total_bw)
 			bts_update_bw(decon->bts.type, bw);
 
-#if defined(CONFIG_EXYNOS_DISPLAYPORT)
 		if ((displayport->state == DISPLAYPORT_STATE_ON)
-			&& (pixelclock >= UHD_60HZ_PIXEL_CLOCK)) /* 4K DP case */
+			&& (pixelclock >= 533000000)) /* 4K DP case */
 			return;
-#endif
 
 		if (decon->bts.max_disp_freq > decon->bts.prev_max_disp_freq)
 			pm_qos_update_request(&decon->bts.disp_qos,
@@ -354,7 +340,7 @@ void dpu_bts_update_bw(struct decon_device *decon, struct decon_reg_data *regs,
 
 void dpu_bts_acquire_bw(struct decon_device *decon)
 {
-#if defined(CONFIG_DECON_BTS_LEGACY) && defined(CONFIG_EXYNOS_DISPLAYPORT)
+#if defined(CONFIG_DECON_BTS_LEGACY)
 	struct displayport_device *displayport = get_displayport_drvdata();
 	videoformat cur = displayport->cur_video;
 	__u64 pixelclock = supported_videos[cur].dv_timings.bt.pixelclock;
@@ -367,7 +353,7 @@ void dpu_bts_acquire_bw(struct decon_device *decon)
 	if (decon->dt.out_type != DECON_OUT_DP)
 		return;
 
-	if (pixelclock >= UHD_60HZ_PIXEL_CLOCK) {
+	if (pixelclock >= 533000000) {
 		if (pm_qos_request_active(&decon->bts.mif_qos))
 			pm_qos_update_request(&decon->bts.mif_qos, 1794 * 1000);
 		else
@@ -413,7 +399,7 @@ void dpu_bts_release_bw(struct decon_device *decon)
 		pm_qos_update_request(&decon->bts.disp_qos, 0);
 		decon->bts.prev_max_disp_freq = 0;
 	} else if (decon->dt.out_type == DECON_OUT_DP) {
-#if defined(CONFIG_DECON_BTS_LEGACY) && defined(CONFIG_EXYNOS_DISPLAYPORT)
+#if defined(CONFIG_DECON_BTS_LEGACY)
 		if (pm_qos_request_active(&decon->bts.mif_qos))
 			pm_qos_update_request(&decon->bts.mif_qos, 0);
 		else
