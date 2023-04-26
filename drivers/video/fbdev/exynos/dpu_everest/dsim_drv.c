@@ -36,7 +36,7 @@
 #include <dt-bindings/clock/exynos9820.h>
 #endif
 #if defined(CONFIG_CPU_IDLE)
-#include <soc/samsung/exynos-cpupm.h>
+#include <soc/samsung/exynos-powermode.h>
 #endif
 #include <soc/samsung/exynos-pmu.h>
 #if defined(CONFIG_SUPPORT_LEGACY_ION)
