@@ -128,7 +128,7 @@ config SUPPORT_LEGACY_ION
 config SUPPORT_LEGACY_FENCE
 	bool "Support legacy fence API"
         depends on EXYNOS_EVEREST
-        default n
+        default y
 
 config SUPPORT_KERNEL_4_9
 	bool "Support kernel version 4.9"
