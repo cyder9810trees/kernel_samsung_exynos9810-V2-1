@@ -123,7 +123,7 @@ config DSIM_CMD_TEST
 config SUPPORT_LEGACY_ION
 	bool "Support legacy ION API"
         depends on EXYNOS_EVEREST
-        default n
+        default y
 
 config SUPPORT_LEGACY_FENCE
 	bool "Support legacy fence API"
@@ -133,7 +133,7 @@ config SUPPORT_LEGACY_FENCE
 config SUPPORT_KERNEL_4_9
 	bool "Support kernel version 4.9"
         depends on EXYNOS_EVEREST
-        default n
+        default y
 
 config EXYNOS_FREQ_HOP
 	bool "Support DPHY PLL Frequency Hopping"
