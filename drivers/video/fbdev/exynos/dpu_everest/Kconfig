@@ -71,7 +71,7 @@ config EXYNOS_MEMMAP_DEBUG
 config EXYNOS_MULTIRESOLUTION
 	bool "Support Multi Resolution LCD"
 	depends on EXYNOS_EVEREST && EXYNOS_WINDOW_UPDATE
-	default n
+	default y
 
 config EXYNOS_VIRTUAL_DISPLAY
 	bool "Support Virtual Display Mode"
