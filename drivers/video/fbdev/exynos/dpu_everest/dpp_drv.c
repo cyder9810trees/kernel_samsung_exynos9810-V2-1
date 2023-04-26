@@ -36,8 +36,6 @@ void dpp_dump(struct dpp_device *dpp)
 {
 	int acquired = console_trylock();
 
-	__dpp_dump(dpp->id, dpp->res.regs, dpp->res.dma_regs, dpp->attr);
-
 	if (acquired)
 		console_unlock();
 }
