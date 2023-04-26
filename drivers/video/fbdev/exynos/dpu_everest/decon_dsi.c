@@ -821,8 +821,6 @@ static char *format_to_string(enum decon_pixel_format format)
 		return "NV16M_S10B";
 	case DECON_PIXEL_FORMAT_NV61M_S10B:
 		return "NV61M_S10B";
-	case DECON_PIXEL_FORMAT_NV12_P010:
-		return "NV12_P010";
 	default:
 		return "INVALID_FMT";
 	}
