@@ -1825,8 +1825,10 @@ int dpu_get_plane_cnt(enum decon_pixel_format format, enum dpp_hdr_standard std)
 u32 dpu_get_alpha_len(int format);
 void dpu_unify_rect(struct decon_rect *r1, struct decon_rect *r2,
 		struct decon_rect *dst);
+#if !defined(CONFIG_SUPPORT_LEGACY_FENCE)
 void dpu_save_fence_info(int fd, struct dma_fence *fence,
 		struct dpu_fence_info *fence_info);
+#endif
 
 void decon_dump(struct decon_device *decon, u32 dsi_dump);
 void decon_to_psr_info(struct decon_device *decon, struct decon_mode_info *psr);

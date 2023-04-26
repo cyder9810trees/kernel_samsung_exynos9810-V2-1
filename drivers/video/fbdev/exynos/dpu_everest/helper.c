@@ -830,6 +830,7 @@ int dpu_pm_domain_check_status(struct exynos_pm_domain *pm_domain)
 }
 #endif
 
+#if !defined(CONFIG_SUPPORT_LEGACY_FENCE)
 void dpu_save_fence_info(int fd, struct dma_fence *fence,
 		struct dpu_fence_info *fence_info)
 {
@@ -840,3 +841,4 @@ void dpu_save_fence_info(int fd, struct dma_fence *fence,
 	strlcpy(fence_info->name, fence->ops->get_driver_name(fence),
 			MAX_DPU_FENCE_NAME);
 }
+#endif

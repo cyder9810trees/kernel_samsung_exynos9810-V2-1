@@ -203,6 +203,7 @@ static int decon_get_valid_fd(void)
 	return fd;
 }
 
+#if !defined(CONFIG_SUPPORT_LEGACY_FENCE)
 void decon_create_release_fences(struct decon_device *decon,
 		struct decon_win_config_data *win_data,
 		struct sync_file *sync_file)
@@ -272,6 +273,7 @@ static struct dma_fence_ops decon_fence_ops = {
 	.wait =			dma_fence_default_wait,
 	.fence_value_str =	decon_fence_value_str,
 };
+#endif
 
 int decon_create_fence(struct decon_device *decon, struct sync_file **sync_file)
 {
