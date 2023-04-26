@@ -70,12 +70,7 @@ static int dsim_runtime_resume(struct device *dev);
 
 static void dsim_dump(struct dsim_device *dsim, int panel_dump)
 {
-	struct dsim_regs regs;
-
 	dsim_info("=== DSIM SFR DUMP ===\n");
-
-	dsim_to_regs_param(dsim, &regs);
-	__dsim_dump(dsim->id, &regs);
 
 	/* Show panel status */
 	if (panel_dump)
@@ -133,7 +128,6 @@ static void dsim_long_data_wr(struct dsim_device *dsim, unsigned long d0, u32 d1
 static int dsim_wait_for_cmd_fifo_empty(struct dsim_device *dsim, bool must_wait)
 {
 	int ret = 0;
-	struct dsim_regs regs;
 
 	if (!must_wait) {
 		/* timer is running, but already command is transferred */
@@ -154,12 +148,6 @@ static int dsim_wait_for_cmd_fifo_empty(struct dsim_device *dsim, bool must_wait
 			return 0;
 		}
 		ret = -ETIMEDOUT;
-	}
-
-	if (IS_DSIM_ON_STATE(dsim) && (ret == -ETIMEDOUT)) {
-		dsim_err("%s timeout\n", __func__);
-		dsim_to_regs_param(dsim, &regs);
-		__dsim_dump(dsim->id, &regs);
 	}
 	return ret;
 }
@@ -291,7 +279,6 @@ int dsim_read_data(struct dsim_device *dsim, u32 id, u32 addr, u32 cnt, u8 *buf)
 	int i, j, ret = 0;
 	u32 rx_fifo_depth = DSIM_RX_FIFO_MAX_DEPTH;
 	struct decon_device *decon = get_decon_drvdata(0);
-	struct dsim_regs regs;
 
 	decon_hiber_block_exit(decon);
 	if (IS_DSIM_OFF_STATE(dsim)) {
@@ -334,11 +321,6 @@ int dsim_read_data(struct dsim_device *dsim, u32 id, u32 addr, u32 cnt, u8 *buf)
 		switch (rx_fifo & 0xff) {
 		case MIPI_DSI_RX_ACKNOWLEDGE_AND_ERROR_REPORT:
 			ret = dsim_reg_rx_err_handler(dsim->id, rx_fifo);
-			if (ret < 0) {
-				dsim_to_regs_param(dsim, &regs);
-				__dsim_dump(dsim->id, &regs);
-				goto exit;
-			}
 			break;
 		case MIPI_DSI_RX_END_OF_TRANSMISSION:
 			dsim_dbg("EoTp was received from LCD module.\n");
@@ -377,8 +359,6 @@ int dsim_read_data(struct dsim_device *dsim, u32 id, u32 addr, u32 cnt, u8 *buf)
 			break;
 		default:
 			dsim_err("Packet format is invaild.\n");
-			dsim_to_regs_param(dsim, &regs);
-			__dsim_dump(dsim->id, &regs);
 			ret = -EBUSY;
 			goto exit;
 		}
@@ -387,8 +367,6 @@ int dsim_read_data(struct dsim_device *dsim, u32 id, u32 addr, u32 cnt, u8 *buf)
 	ret = rx_size;
 	if (!rx_fifo_depth) {
 		dsim_err("Check DPHY values about HS clk.\n");
-		dsim_to_regs_param(dsim, &regs);
-		__dsim_dump(dsim->id, &regs);
 		ret = -EBUSY;
 	}
 exit:
@@ -402,7 +380,6 @@ static void dsim_write_timeout_fn(struct work_struct *work)
 {
 	struct dsim_device *dsim =
 		container_of(work, struct dsim_device, wr_timeout_work);
-	struct dsim_regs regs;
 	struct decon_device *decon = get_decon_drvdata(0);
 
 	dsim_dbg("%s +\n", __func__);
@@ -420,9 +397,6 @@ static void dsim_write_timeout_fn(struct work_struct *work)
 		dsim_reg_clear_int(dsim->id, DSIM_INTSRC_SFR_PH_FIFO_EMPTY);
 		goto exit;
 	}
-
-	dsim_to_regs_param(dsim, &regs);
-	__dsim_dump(dsim->id, &regs);
 
 exit:
 	mutex_unlock(&dsim->cmd_lock);
@@ -917,8 +891,6 @@ out:
 
 static int _dsim_disable(struct dsim_device *dsim, enum dsim_state state)
 {
-	struct dsim_regs regs;
-
 	if (IS_DSIM_OFF_STATE(dsim)) {
 		dsim_warn("%s dsim already off(%s)\n",
 				__func__, dsim_state_names[dsim->state]);
@@ -936,10 +908,6 @@ static int _dsim_disable(struct dsim_device *dsim, enum dsim_state state)
 	dsim->state = state;
 	mutex_unlock(&dsim->cmd_lock);
 
-	if (dsim_reg_stop(dsim->id, dsim->data_lane) < 0) {
-		dsim_to_regs_param(dsim, &regs);
-		__dsim_dump(dsim->id, &regs);
-	}
 	disable_irq(dsim->res.irq);
 
 	/* HACK */

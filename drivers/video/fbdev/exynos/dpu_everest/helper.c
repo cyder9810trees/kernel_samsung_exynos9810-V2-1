@@ -839,14 +839,6 @@ int dpu_pm_domain_check_status(struct exynos_pm_domain *pm_domain)
 }
 #endif
 
-void dsim_to_regs_param(struct dsim_device *dsim, struct dsim_regs *regs)
-{
-	regs->regs = dsim->res.regs;
-	regs->ss_regs = dsim->res.ss_regs;
-	regs->phy_regs = dsim->res.phy_regs;
-	regs->phy_regs_ex = dsim->res.phy_regs_ex;
-}
-
 void dpu_save_fence_info(int fd, struct dma_fence *fence,
 		struct dpu_fence_info *fence_info)
 {
