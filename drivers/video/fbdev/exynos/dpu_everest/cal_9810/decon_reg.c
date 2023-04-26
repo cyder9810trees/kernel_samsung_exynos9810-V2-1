@@ -1538,7 +1538,7 @@ static int decon_reg_stop_inst(u32 id, u32 dsi_idx, struct decon_mode_info *psr,
 }
 
 
-static void decon_reg_set_win_enable(u32 id, u32 win_idx, u32 en)
+void decon_reg_set_win_enable(u32 id, u32 win_idx, u32 en)
 {
 	u32 val, mask;
 

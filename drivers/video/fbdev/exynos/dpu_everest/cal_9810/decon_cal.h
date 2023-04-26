@@ -246,6 +246,7 @@ int decon_reg_stop(u32 id, u32 dsi_idx, struct decon_mode_info *psr, bool rst,
 		u32 fps);
 
 /* DECON window control */
+void decon_reg_set_win_enable(u32 id, u32 win_idx, u32 en);
 void decon_reg_win_enable_and_update(u32 id, u32 win_idx, u32 en);
 void decon_reg_set_window_control(u32 id, int win_idx,
 		struct decon_window_regs *regs, u32 winmap_en);
