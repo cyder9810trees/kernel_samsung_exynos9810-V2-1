@@ -108,7 +108,7 @@ config EXYNOS_ADAPTIVE_FREQ
 config DECON_BTS_LEGACY
 	bool "Legacy BTS scheme of display"
         depends on EXYNOS_EVEREST
-        default n
+        default y
 
 config FB_TEST
 	bool "Framebuffer test only"
