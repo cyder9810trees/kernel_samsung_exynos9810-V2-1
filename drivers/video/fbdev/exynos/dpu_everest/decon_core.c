@@ -2835,9 +2835,11 @@ static int decon_prepare_win_config(struct decon_device *decon,
 
 	decon_dbg("%s +\n", __func__);
 
+/*
 	ret = decon_check_global_limitation(decon, win_config);
 	if (ret)
 		goto config_err;
+*/
 
 	for (i = 0; i < decon->dt.max_win && !ret; i++) {
 		config = &win_config[i];
@@ -2898,7 +2900,9 @@ static int decon_prepare_win_config(struct decon_device *decon,
 			dpu_translate_fmt_to_dpp(regs->dpp_config[i].format);
 	}
 
+/*
 config_err:
+*/
 
 	decon_dbg("%s -\n", __func__);
 
