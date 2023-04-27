@@ -1765,11 +1765,7 @@ static long panel_core_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg
 #ifdef CONFIG_SUPPORT_DSU
 	case PANEL_IOC_SET_DSU:
 		panel_info("PANEL:INFO:%s:PANEL_IOC_SET_DSU\n", __func__);
-#ifdef CONFIG_EXYNOS_MULTIRESOLUTION
 		ret = panel_set_mres(panel, arg);
-#else
-		ret = panel_set_dsu(panel, arg);
-#endif
 		break;
 #endif
 	case PANEL_IOC_DISP_ON:
