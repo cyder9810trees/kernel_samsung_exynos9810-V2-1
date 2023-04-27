@@ -588,20 +588,20 @@ static int decon_get_protect_id(int dma_id)
 	int prot_id = 0;
 
 	switch (dma_id) {
-	case IDMA_GF0:
-		prot_id = PROT_GF0;
+	case IDMA_G0:
+		prot_id = PROT_G0;
 		break;
-	case IDMA_GF1:
-		prot_id = PROT_GF1;
+	case IDMA_G1:
+		prot_id = PROT_G1;
 		break;
-	case IDMA_VG:
-		prot_id = PROT_VG;
+	case IDMA_VG0:
+		prot_id = PROT_VG0;
 		break;
-	case IDMA_VGF:
-		prot_id = PROT_VGF;
+	case IDMA_VG1:
+		prot_id = PROT_VG1;
 		break;
-	case IDMA_VGS:
-		prot_id = PROT_VGS;
+	case IDMA_VGFS:
+		prot_id = PROT_VGFS;
 		break;
 	case IDMA_VGRFS:
 		prot_id = PROT_VGRFS;

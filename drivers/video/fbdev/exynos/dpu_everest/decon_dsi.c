@@ -720,17 +720,17 @@ static char *idma_to_string(enum decon_idma_type type)
 {
 	switch (type) {
 	case 0:
-		return "IDMA_GF0";
+		return "IDMA_G0";
 	case 1:
 		return "IDMA_VGRFS";
 	case 2:
-		return "IDMA_GF1";
+		return "IDMA_G1";
 	case 3:
-		return "IDMA_VGF";
+		return "IDMA_VG1";
 	case 4:
-		return "IDMA_VG";
+		return "IDMA_VG0";
 	case 5:
-		return "IDMA_VGS";
+		return "IDMA_VGFS";
 	default:
 		return "INVALID";
 	}

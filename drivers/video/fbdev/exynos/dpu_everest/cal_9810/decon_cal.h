@@ -32,6 +32,14 @@ enum decon_idma_type {
 	MAX_DECON_DMA_TYPE,
 };
 
+/* IDMA Type Mappings */
+#define IDMA_G0      IDMA_G0
+#define IDMA_G1      IDMA_G1
+#define IDMA_VG0     IDMA_VG0
+#define IDMA_VG1     IDMA_VG1
+#define IDMA_VGFS    IDMA_VGF0
+#define IDMA_VGRFS   IDMA_VGF1
+
 enum decon_fifo_mode {
 	DECON_FIFO_00K = 0,
 	DECON_FIFO_04K,
