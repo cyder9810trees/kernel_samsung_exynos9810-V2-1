@@ -1057,7 +1057,7 @@ int decon_enter_hiber(struct decon_device *decon)
 
 	ret = decon_reg_stop(decon->id, decon->dt.out_idx[0], &psr, true);
 	if (ret < 0)
-		decon_dump(decon);
+		decon_dump(decon, REQ_DSI_DUMP);
 
 	if (!decon->id && (decon->vsync.irq_refcount <= 0) &&
 			decon->eint_status) {
