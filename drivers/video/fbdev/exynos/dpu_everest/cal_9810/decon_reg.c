@@ -1830,6 +1830,15 @@ void decon_reg_win_enable_and_update(u32 id, u32 win_idx, u32 en)
 	decon_reg_update_req_window(id, win_idx);
 }
 
+void decon_reg_all_win_shadow_update_req(u32 id)
+{
+	u32 mask;
+
+	mask = SHADOW_REG_UPDATE_REQ_FOR_DECON;
+
+	decon_write_mask(id, SHADOW_REG_UPDATE_REQ, ~0, mask);
+}
+
 void decon_reg_set_window_control(u32 id, int win_idx,
 		struct decon_window_regs *regs, u32 winmap_en)
 {
