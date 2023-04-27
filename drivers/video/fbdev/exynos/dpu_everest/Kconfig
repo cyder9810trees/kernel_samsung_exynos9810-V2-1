@@ -19,7 +19,7 @@ config EXYNOS_MIPI_DSIM
 config EXYNOS_DISPLAYPORT
 	bool "Samsung Exynos DISPLAYPORT driver"
 	depends on EXYNOS_EVEREST
-	default n
+	default y
 	help
 	  Enable DISPLAYPORT driver.
 
