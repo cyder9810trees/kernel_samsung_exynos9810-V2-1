@@ -2316,7 +2316,7 @@ int decon_update_last_regs(struct decon_device *decon,
 		decon_set_cursor_unmask(decon, false);
 
 	decon_wait_for_vstatus(decon, 50);
-	if (decon_reg_wait_for_update_timeout(decon->id, SHADOW_UPDATE_TIMEOUT) < 0) {
+	if (decon_reg_wait_update_done_timeout(decon->id, SHADOW_UPDATE_TIMEOUT) < 0) {
 		decon_err("%s shadow update timeout\n", __func__);
 		ret = -ETIMEDOUT;
 		goto end;
