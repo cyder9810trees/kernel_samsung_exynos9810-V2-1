@@ -1924,9 +1924,10 @@ static u32 dsim_reg_translate_lanecnt_to_lanes(int lanecnt)
 	return lanes;
 }
 
-void dsim_reg_init(u32 id, struct decon_lcd *lcd_info, struct dsim_clks *clks,
+int dsim_reg_init(u32 id, struct decon_lcd *lcd_info, struct dsim_clks *clks,
 		bool panel_ctrl)
 {
+	int ret = 0;
 	u32 lanes;
 #if !defined(CONFIG_EXYNOS_LCD_ON_UBOOT)
 	struct dsim_device *dsim = get_dsim_drvdata(id);
@@ -1943,7 +1944,7 @@ void dsim_reg_init(u32 id, struct decon_lcd *lcd_info, struct dsim_clks *clks,
 #else
 	/* Panel power on */
 	if (panel_ctrl)
-		dsim_set_panel_power(dsim, 1);
+		ret = dsim_set_panel_power(dsim, 1);
 #endif
 
 	dsim_reg_sw_reset(id);
@@ -1964,9 +1965,10 @@ void dsim_reg_init(u32 id, struct decon_lcd *lcd_info, struct dsim_clks *clks,
 #if defined(CONFIG_EXYNOS_LCD_ON_UBOOT)
 	/* TODO: This code will be implemented as uboot style */
 #else
-	if (panel_ctrl)
-		dsim_reset_panel(dsim);
+	if (!ret && panel_ctrl)
+		ret = dsim_reset_panel(dsim);
 #endif
+	return ret;
 }
 
 /* Set clocks and lanes and HS ready */
