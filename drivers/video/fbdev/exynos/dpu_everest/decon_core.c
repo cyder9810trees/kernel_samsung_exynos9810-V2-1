@@ -129,7 +129,7 @@ void tracing_mark_write(struct decon_device *decon, char id, char *str1, int val
 		return;
 	}
 
-	trace_printk(buf);
+//	trace_printk(buf);
 }
 
 static void decon_dump_using_dpp(struct decon_device *decon)
@@ -185,8 +185,8 @@ void decon_dump(struct decon_device *decon, u32 dsi_dump)
 		return;
 	}
 
-	__decon_dump(decon->id, decon->res.regs, base_regs,
-			decon->lcd_info->dsc_enabled);
+//	__decon_dump(decon->id, decon->res.regs, base_regs,
+//			decon->lcd_info->dsc_enabled);
 
 	if (decon->dt.out_type == DECON_OUT_DSI)
 		v4l2_subdev_call(decon->out_sd[0], core, ioctl,

@@ -1087,20 +1087,6 @@ static int dsim_s_stream(struct v4l2_subdev *sd, int enable)
 static int dsim_set_pre_freq_hop(struct dsim_device *dsim, struct df_param *param)
 {
 	int ret = 0;
-	
-#if defined(CONFIG_SOC_EXYNOS9820_EVT0)
-	return ret;
-#endif
-
-	if (param->context)
-		dsim_dbg("[DYN_FREQ]:INFO:%s:p,m,k:%d,%d,%d\n", 
-			__func__, param->pms.p, param->pms.m, param->pms.k);
-
-	dsim_reg_set_dphy_freq_hopping(dsim->id,
-		param->pms.p, param->pms.m, param->pms.k, 1);
-
-	//memcpy(status->c_lp_ref, status->r_lp_ref, sizeof(unsigned int) * mres_cnt);
-
 	return ret;
 }
 
@@ -1108,38 +1094,12 @@ static int dsim_set_pre_freq_hop(struct dsim_device *dsim, struct df_param *para
 static int dsim_set_post_freq_hop(struct dsim_device *dsim, struct df_param *param)
 {
 	int ret = 0;
-
-#if defined(CONFIG_SOC_EXYNOS9820_EVT0)
-	return ret;
-#endif
-
-	if (param->context)
-		dsim_dbg("[DYN_FREQ]:INFO:%s:p,m,k:%d,%d,%d\n", 
-			__func__, param->pms.p, param->pms.m, param->pms.k);
-
-	dsim_reg_set_dphy_freq_hopping(dsim->id,
-		param->pms.p, param->pms.m, param->pms.k, 0);
-
 	return ret;
 }
 #endif
 
 static int dsim_set_freq_hop(struct dsim_device *dsim, struct decon_freq_hop *freq)
 {
-#if !defined(CONFIG_SOC_EXYNOS9820_EVT0)
-	struct stdphy_pms *pms;
-
-	if (!IS_DSIM_ON_STATE(dsim)) {
-		dsim_err("%s: dsim%d is off state\n", __func__, dsim->id);
-		return -EINVAL;
-	}
-
-	pms = &dsim->lcd_info.dphy_pms;
-	/* If target M value is 0, frequency hopping will be disabled */
-	dsim_reg_set_dphy_freq_hopping(dsim->id, pms->p, freq->target_m,
-			freq->target_k, (freq->target_m > 0) ? 1 : 0);
-#endif
-
 	return 0;
 }
 

@@ -1740,28 +1740,10 @@ void decon_init_low_persistence_mode(struct decon_device *decon)
 
 void dpu_init_freq_hop(struct decon_device *decon)
 {
-#if !defined(CONFIG_SOC_EXYNOS9820_EVT0)
-	if (IS_ENABLED(CONFIG_EXYNOS_FREQ_HOP)) {
-		decon->freq_hop.enabled = true;
-		decon->freq_hop.target_m = decon->lcd_info->dphy_pms.m;
-		decon->freq_hop.request_m = decon->lcd_info->dphy_pms.m;
-		decon->freq_hop.target_k = decon->lcd_info->dphy_pms.k;
-		decon->freq_hop.request_k = decon->lcd_info->dphy_pms.k;
-	} else {
-		decon->freq_hop.enabled = false;
-	}
-#endif
 }
 
 void dpu_update_freq_hop(struct decon_device *decon)
 {
-#if !defined(CONFIG_SOC_EXYNOS9820_EVT0)
-	if (!decon->freq_hop.enabled)
-		return;
-
-	decon->freq_hop.target_m = decon->freq_hop.request_m;
-	decon->freq_hop.target_k = decon->freq_hop.request_k;
-#endif
 }
 
 #ifdef CONFIG_DYNAMIC_FREQ
@@ -1865,74 +1847,11 @@ static int dpu_set_post_df_dsim(struct decon_device *decon)
 
 void dpu_set_freq_hop(struct decon_device *decon, struct decon_reg_data *regs, bool en)
 {
-#if defined(CONFIG_SOC_EXYNOS9820_EVT0)
 	return;
-#endif
-
-	if ((decon->dt.out_type != DECON_OUT_DSI) || (!decon->freq_hop.enabled))
-		return;
-
-	if (en) {
-		regs->df_update = dpu_check_df_update(decon);
-
-		if (regs->df_update == MAGIC_DF_UPDATED) {
-#if defined(CONFIG_EXYNOS_PLL_SLEEP)
-			/* wakeup PLL if sleeping... */
-			decon_reg_set_pll_wakeup(decon->id, true);
-			decon_reg_set_pll_sleep(decon->id, false);
-#endif
-			dpu_set_pre_df_dsim(decon);
-		}
-	} else {
-		if (regs->df_update == MAGIC_DF_UPDATED) {
-			dpu_set_post_df_dsim(decon);
-#if defined(CONFIG_EXYNOS_PLL_SLEEP)
-			decon_reg_set_pll_sleep(decon->id, true);
-#endif
-			decon_panel_ioc_update_ffc(decon);
-
-			dpu_finish_df_update(decon);
-		}
-	}
 }
 
 #else
 void dpu_set_freq_hop(struct decon_device *decon, struct decon_reg_data *regs, bool en)
 {
-#if !defined(CONFIG_SOC_EXYNOS9820_EVT0)
-	struct stdphy_pms *pms;
-	struct decon_freq_hop freq_hop;
-	u32 target_m = decon->freq_hop.target_m;
-	u32 target_k = decon->freq_hop.target_k;
-
-	if ((decon->dt.out_type != DECON_OUT_DSI) || (!decon->freq_hop.enabled))
-		return;
-
-	pms = &decon->lcd_info->dphy_pms;
-	if ((pms->m != target_m) || (pms->k != target_k)) {
-		if (en) {
-#if defined(CONFIG_EXYNOS_PLL_SLEEP)
-			/* wakeup PLL if sleeping... */
-			decon_reg_set_pll_wakeup(decon->id, true);
-			decon_reg_set_pll_sleep(decon->id, false);
-#endif
-
-			v4l2_subdev_call(decon->out_sd[0], core, ioctl,
-					DSIM_IOC_SET_FREQ_HOP, &decon->freq_hop);
-
-		} else {
-			pms->m = decon->freq_hop.target_m;
-			pms->k = decon->freq_hop.target_k;
-			freq_hop.target_m = 0;
-			decon_info("%s: pmsk[%d %d %d %d]\n", __func__,
-					pms->p, pms->m, pms->s, pms->k);
-			v4l2_subdev_call(decon->out_sd[0], core, ioctl,
-					DSIM_IOC_SET_FREQ_HOP, &freq_hop);
-#if defined(CONFIG_EXYNOS_PLL_SLEEP)
-			decon_reg_set_pll_sleep(decon->id, true);
-#endif
-		}
-	}
-#endif
 }
 #endif
