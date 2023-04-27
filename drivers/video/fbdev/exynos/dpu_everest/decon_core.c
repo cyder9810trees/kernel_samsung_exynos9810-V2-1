@@ -177,7 +177,7 @@ static void decon_up_list_saved(void)
 void decon_dump(struct decon_device *decon, u32 dsi_dump)
 {
 	int acquired = console_trylock();
-	void __iomem *base_regs = get_decon_drvdata(0)->res.regs;
+//	void __iomem *base_regs = get_decon_drvdata(0)->res.regs;
 
 	if (IS_DECON_OFF_STATE(decon)) {
 		decon_info("%s: DECON%d is disabled, state(%d)\n",
