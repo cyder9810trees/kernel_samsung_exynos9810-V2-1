@@ -711,7 +711,7 @@ static int dsim_reset_panel(struct dsim_device *dsim)
 	return 0;
 }
 #endif
-static int dsim_set_panel_power(struct dsim_device *dsim, bool on)
+int dsim_set_panel_power(struct dsim_device *dsim, bool on)
 {
 	int ret;
 
