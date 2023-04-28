@@ -1949,11 +1949,13 @@ void dsim_reg_init(u32 id, struct decon_lcd *lcd_info, struct dsim_clks *clks,
 
 	dsim_reg_set_config(id, lcd_info, clks);
 
+#if !defined(CONFIG_EXYNOS_COMMON_PANEL)
 #if defined(CONFIG_EXYNOS_LCD_ON_UBOOT)
 	/* TODO: This code will be implemented as uboot style */
 #else
 	if (panel_ctrl)
 		dsim_reset_panel(dsim);
+#endif
 #endif
 }
 
