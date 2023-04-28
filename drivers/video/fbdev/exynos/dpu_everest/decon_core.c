@@ -1657,6 +1657,7 @@ static int decon_set_dpp_config(struct decon_device *decon,
 			EXYNOS_DPU_GET_ACLK, NULL) / 1000U;
 
 	for (i = 0; i < decon->dt.max_win; i++) {
+		memset(&dpp_config, 0, sizeof (struct dpp_config));
 		win = decon->win[i];
 		/*
 		 * Although DPP number is set in cur_using_dpp, connected window
