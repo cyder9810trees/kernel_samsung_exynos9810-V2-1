@@ -1275,41 +1275,9 @@ irqreturn_t dma_irq_handler(int irq, void *priv)
 	if (irqs & irq_pend)
 		cfg_err = dma_read(dpp->id, reg_id);
 
-	if (irqs & IDMA_RECOVERY_START_IRQ) {
-		DPU_EVENT_LOG(DPU_EVT_DMA_RECOVERY, &dpp->sd,
-				ktime_set(0, 0));
-		val = (u32)dpp->dpp_config->config.dpp_parm.comp_src;
-		dpp->d.recovery_cnt++;
-		dpp_info("dma%d recovery start(0x%x).. [src=%s], cnt[%d %d]\n",
-				dpp->id, irqs,
-				val == DPP_COMP_SRC_G2D ? "G2D" : "GPU",
-				get_dpp_drvdata(IDMA_VGF0)->d.recovery_cnt,
-				get_dpp_drvdata(IDMA_VGF1)->d.recovery_cnt);
-
-#ifdef CONFIG_SEC_ABC
-		if (!(dpp->d.recovery_cnt % 10))
-			sec_abc_send_event("MODULE=display@ERROR=afbc_recovery");
-#endif
-		goto irq_end;
-	}
-
-	if ((irqs & IDMA_AFBC_TIMEOUT_IRQ) ||
-			(irqs & IDMA_READ_SLAVE_ERROR) ||
-			(irqs & IDMA_STATUS_DEADLOCK_IRQ)) {
-		dpp_err("dma%d error irq occur(0x%x)\n", dpp->id, irqs);
-		dpp_dump(dpp);
-		goto irq_end;
-	}
-
-	if (irqs & IDMA_CONFIG_ERROR) {
-		val = IDMA_CFG_ERR_IMG_HEIGHT
-			| IDMA_CFG_ERR_IMG_HEIGHT_ROTATION;
-		if (cfg_err & val)
-			dpp_err("dma%d config: img_height(0x%x)\n",
-					dpp->id, irqs);
-		else {
-			dpp_err("dma%d config error occur(0x%x)\n",
-					dpp->id, irqs);
+	if (test_bit(DPP_ATTR_ODMA, &dpp->attr)) {
+		if (irqs & ODMA_CONFIG_ERROR) {
+			dpp_err("dma%d config error occur(0x%x)\n", dpp->id, irqs);
 			dpp_err("CFG_ERR_STATE = (0x%x)\n", cfg_err);
 			/* TODO: add to read config error information */
 			dpp_dump(dpp);
