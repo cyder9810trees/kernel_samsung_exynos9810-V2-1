@@ -1031,9 +1031,25 @@ static void dpp_parse_dt(struct dpp_device *dpp, struct device *dev)
 {
 	dpp->id = of_alias_get_id(dev->of_node, "dpp");
 	dpp_info("dpp(%d) probe start..\n", dpp->id);
+
+	// Read attributes from device tree
 	of_property_read_u32(dev->of_node, "attr", (u32 *)&dpp->attr);
 	dpp_info("attributes = 0x%lx\n", dpp->attr);
 
+	// Print feature support for each attribute
+	dpp_info("AFBC supported: %d\n", test_bit(DPP_ATTR_AFBC, &dpp->attr));
+	dpp_info("Block supported: %d\n", test_bit(DPP_ATTR_BLOCK, &dpp->attr));
+	dpp_info("Flip supported: %d\n", test_bit(DPP_ATTR_FLIP, &dpp->attr));
+	dpp_info("Rotation supported: %d\n", test_bit(DPP_ATTR_ROT, &dpp->attr));
+	dpp_info("CSC supported: %d\n", test_bit(DPP_ATTR_CSC, &dpp->attr));
+	dpp_info("Scaling supported: %d\n", test_bit(DPP_ATTR_SCALE, &dpp->attr));
+	dpp_info("HDR supported: %d\n", test_bit(DPP_ATTR_HDR, &dpp->attr));
+	dpp_info("HDR10 supported: %d\n", test_bit(DPP_ATTR_HDR10, &dpp->attr));
+	dpp_info("IDMA supported: %d\n", test_bit(DPP_ATTR_IDMA, &dpp->attr));
+	dpp_info("ODMA supported: %d\n", test_bit(DPP_ATTR_ODMA, &dpp->attr));
+	dpp_info("DPP supported: %d\n", test_bit(DPP_ATTR_DPP, &dpp->attr));
+
+	// Set device pointer
 	dpp->dev = dev;
 
 	if ((dpp->id == IDMA_G0) &&
