@@ -275,6 +275,7 @@ config EXYNOS_IOVMM
 config EXYNOS_IOMMU_DEBUG
 	bool "Debugging log for Exynos IOMMU"
 	depends on EXYNOS_IOMMU
+	default y
 	help
 	  Select this to see the detailed log message that shows what
 	  happens in the IOMMU driver.
