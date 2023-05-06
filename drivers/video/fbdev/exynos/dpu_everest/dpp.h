@@ -38,44 +38,10 @@ extern int dpp_log_level;
 /* about 1msec @ ACLK=630MHz */
 #define INIT_RCV_NUM		630000
 
-#define SRC_SIZE_MULTIPLE	1
 #define SRC_WIDTH_MIN		16
 #define SRC_WIDTH_MAX		65534
 #define SRC_HEIGHT_MIN		16
 #define SRC_HEIGHT_MAX		8190
-#define IMG_SIZE_MULTIPLE	1
-#define IMG_WIDTH_MIN		16
-#define IMG_WIDTH_MAX		4096
-#define IMG_HEIGHT_MIN		16
-#define IMG_HEIGHT_MAX		4096
-#define IMG_ROT_HEIGHT_MAX	2160
-#define SRC_OFFSET_MULTIPLE	1
-
-#define SCALED_WIDTH_MIN	16
-#define SCALED_WIDTH_MAX	4096
-#define SCALED_HEIGHT_MIN	16
-#define SCALED_HEIGHT_MAX	4096
-#define SCALED_SIZE_MULTIPLE	1
-#define SCALED_SIZE_MULTIPLE	1
-
-#define BLK_WIDTH_MIN		4
-#define BLK_WIDTH_MAX		4096
-#define BLK_HEIGHT_MIN		1
-#define BLK_HEIGHT_MAX		4096
-#define BLK_SIZE_MULTIPLE	1
-#define BLK_SIZE_MULTIPLE	1
-
-#define DST_SIZE_MULTIPLE	1
-#define DST_SIZE_WIDTH_MIN	16
-#define DST_SIZE_WIDTH_MAX	8190
-#define DST_SIZE_HEIGHT_MIN	16
-#define DST_SIZE_HEIGHT_MAX	8190
-#define DST_OFFSET_MULTIPLE	1
-#define DST_IMG_MULTIPLE	1
-#define DST_IMG_WIDTH_MIN	16
-#define DST_IMG_WIDTH_MAX	4096
-#define DST_IMG_HEIGHT_MIN	16
-#define DST_IMG_HEIGHT_MAX	4096
 
 #define check_align(width, height, align_w, align_h)\
 	(IS_ALIGNED(width, align_w) && IS_ALIGNED(height, align_h))
@@ -441,13 +407,15 @@ static inline void dpp_select_format(struct dpp_device *dpp,
 void dpp_dump(struct dpp_device *dpp);
 void dpp_release_rpm_hold(u32 id);
 
+struct dpp_restriction;
+
 /* DPP low-level APIs exposed to DPP driver */
 void dpp_reg_irq_enable(u32 id);
 void dpp_reg_init(u32 id, unsigned long attr);
 int dpp_reg_deinit(u32 id, bool reset, unsigned long attr);
 void dpp_reg_configure_params(u32 id, struct dpp_params_info *p, unsigned long attr);
 void dpp_constraints_params(struct dpp_size_constraints *vc,
-					struct dpp_img_format *vi);
+					struct dpp_img_format *vi, struct dpp_restriction *res);
 
 /* DPU DMA DEBUG */
 void dma_reg_dump_com_debug_regs(int id);
