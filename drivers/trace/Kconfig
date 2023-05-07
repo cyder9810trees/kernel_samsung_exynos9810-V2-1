@@ -12,7 +12,7 @@ if TRACE
 
 config EXYNOS_ITMON
         bool "Exynos IPs Traffic Monitor"
-        default y
+        default n
         depends on ARCH_EXYNOS
 
 menuconfig EXYNOS_SNAPSHOT
