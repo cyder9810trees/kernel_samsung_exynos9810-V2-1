@@ -20,7 +20,7 @@
 #include "dpp.h"
 #include "decon.h"
 
-int dpp_log_level = 6;
+int dpp_log_level = 7;
 
 #if defined(DMA_BIST)
 u32 pattern_data[] = {

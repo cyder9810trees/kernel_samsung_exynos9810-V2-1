@@ -61,7 +61,7 @@
 #define HDCP_2_2_NOT_AUTH      0
 #define HDCP_2_2_AUTH_DONE     1
 
-int displayport_log_level = 6;
+int displayport_log_level = 7;
 static u8 max_lane_cnt;
 static u8 max_link_rate;
 static int reduced_resolution;
