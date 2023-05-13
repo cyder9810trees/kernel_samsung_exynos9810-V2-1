@@ -479,6 +479,7 @@ void decon_set_black_window(struct decon_device *decon)
 			&win_regs, true);
 }
 
+#if 0
 void decon_set_color_window(struct decon_device *decon, u32 color)
 {
 	struct decon_window_regs win_regs;
@@ -506,6 +507,7 @@ void decon_set_color_window(struct decon_device *decon, u32 color)
 			&win_regs, true);
 	decon_reg_update_req_window(decon->id, decon->dt.dft_win);
 }
+#endif
 
 
 int decon_tui_protection(bool tui_en)
