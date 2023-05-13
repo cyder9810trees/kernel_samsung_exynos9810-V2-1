@@ -1052,7 +1052,7 @@ static void dpp_parse_dt(struct dpp_device *dpp, struct device *dev)
 	// Set device pointer
 	dpp->dev = dev;
 
-	if ((dpp->id == IDMA_G0) &&
+	if ((dpp->id == 0) &&
 		(of_property_read_bool(dev->of_node, "dpp,hold-rpm-on-boot"))) {
 		dpp->hold_rpm_on_boot = true;
 		dpp_info("dpp,hold-rpm-on-boot\n");
