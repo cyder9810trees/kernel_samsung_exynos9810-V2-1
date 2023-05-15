@@ -1558,6 +1558,7 @@ static int dsim_init_resources(struct dsim_device *dsim, struct platform_device 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (!res) {
 		dsim_info("no 2nd mem resource\n");
+		dsim->res.phy_regs = NULL;
 	} else {
 		dsim_info("dphy res: start(0x%x), end(0x%x)\n",
 				(u32)res->start, (u32)res->end);
