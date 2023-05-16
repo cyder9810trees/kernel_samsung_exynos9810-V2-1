@@ -5188,7 +5188,7 @@
 		#pb-id-cells = <3>;
 		reg = <0 369233920 4096 0 369561600 4096 0 369557504 272>;
 		interrupts = <0 197 0 0 204 0>;
-		attr = <327702>;
+		attr = <327686>;
 		src_f_w = <16 65534 1>;
 		src_f_h = <16 8190 1>;
 		src_w = <16 4096 1>;
@@ -5213,7 +5213,7 @@
 		#pb-id-cells = <3>;
 		reg = <0 369238016 4096 0 369565696 4096>;
 		interrupts = <0 198 0 0 205 0>;
-		attr = <327771>;
+		attr = <327686>;
 		samsung,power-domain = <13>;
 		linux,phandle = <495>;
 		phandle = <495>;
@@ -5224,7 +5224,7 @@
 		#pb-id-cells = <3>;
 		reg = <0 369242112 4096 0 369569792 4096>;
 		interrupts = <0 199 0 0 206 0>;
-		attr = <327807>;
+		attr = <327702>;
 		samsung,power-domain = <13>;
 		linux,phandle = <496>;
 		phandle = <496>;
@@ -5235,7 +5235,7 @@
 		#pb-id-cells = <3>;
 		reg = <0 369246208 4096 0 369573888 4096>;
 		interrupts = <0 200 0 0 207 0>;
-		attr = <327686>; /* DPP/IDMA/FLIP/BLOCK */
+		attr = <327702>;
 		samsung,power-domain = <13>;
 		linux,phandle = <497>;
 		phandle = <497>;
@@ -5246,7 +5246,7 @@
 		#pb-id-cells = <3>;
 		reg = <0 369250304 4096 0 369577984 4096>;
 		interrupts = <0 201 0 0 208 0>;
-		attr = <327702>;
+		attr = <327703>;
 		samsung,power-domain = <13>;
 		linux,phandle = <498>;
 		phandle = <498>;
@@ -5257,7 +5257,7 @@
 		#pb-id-cells = <3>;
 		reg = <0 369254400 4096 0 369582080 4096>;
 		interrupts = <0 202 0 0 209 0>;
-		attr = <327686>; /* DPP/IDMA/FLIP/BLOCK */
+		attr = <327807>;
 		samsung,power-domain = <13>;
 		linux,phandle = <499>;
 		phandle = <499>;
