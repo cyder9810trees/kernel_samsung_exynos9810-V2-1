@@ -742,6 +742,30 @@ static void dpp_parse_dt(struct dpp_device *dpp, struct device *dev)
 	of_property_read_u32(node, "attr", (u32 *)&dpp->attr);
 	dpp_info("attributes = 0x%lx\n", dpp->attr);
 
+	switch (dpp->id) {
+		case 0:
+			dpp_info("dpp(%d) is IDMA_VG0", dpp->id);
+			break;
+		case 1:
+			dpp_info("dpp(%d) is IDMA_VGF0", dpp->id);
+			break;
+		case 2:
+			dpp_info("dpp(%d) is IDMA_VGF1", dpp->id);
+			break;
+		case 3:
+			dpp_info("dpp(%d) is IDMA_G1", dpp->id);
+			break;
+		case 4:
+			dpp_info("dpp(%d) is IDMA_VG1", dpp->id);
+			break;
+		case 5:
+			dpp_info("dpp(%d) is IDMA_G0", dpp->id);
+			break;
+		default:
+			dpp_info("dpp(%d) is invalid", dpp->id);
+			break;
+	}
+
 	if (dpp->id == 0) {
 		dpp_parse_restriction(dpp, node);
 		dpp_print_restriction(dpp);
