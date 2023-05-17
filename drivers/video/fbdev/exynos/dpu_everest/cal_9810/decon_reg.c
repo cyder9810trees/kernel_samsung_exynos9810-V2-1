@@ -706,10 +706,14 @@ int decon_reg_wait_for_update_timeout(u32 id, unsigned long timeout)
 	while (decon_read(id, SHADOW_REG_UPDATE_REQ) && --cnt)
 		udelay(delay_time);
 
+#if 0
+	// Causes kernel panic on boot and logic reworked for dpu20
+	// Disable until proper solution is found
 	if (!cnt) {
 		decon_err("decon%d timeout of updating decon registers\n", id);
 		return -EBUSY;
 	}
+#endif
 
 	return 0;
 }
