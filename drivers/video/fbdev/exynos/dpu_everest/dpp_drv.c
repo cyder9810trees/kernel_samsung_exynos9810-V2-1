@@ -1145,6 +1145,7 @@ static void dpp_parse_dt(struct dpp_device *dpp, struct device *dev)
 	of_property_read_u32(node, "attr", (u32 *)&dpp->attr);
 	dpp_info("attributes = 0x%lx\n", dpp->attr);
 
+#if CONFIG_EXYNOS_EVEREST_DEBUG
 	switch (dpp->id) {
 	case IDMA_G0:
 		dpp_info("IDMA type is IDMA_G0");
@@ -1171,6 +1172,7 @@ static void dpp_parse_dt(struct dpp_device *dpp, struct device *dev)
 		dpp_info("Unknown IDMA type");
 		break;
 	}
+#endif
 
 	if (dpp->id == IDMA_G0) {
 		dpp_parse_restriction(dpp, node);
